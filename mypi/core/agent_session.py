@@ -6,8 +6,6 @@ from mypi.ai.provider import LLMProvider, TokenEvent, LLMToolCallEvent, DoneEven
 from mypi.core.events import (
     BeforeAgentStartEvent, BeforeProviderRequestEvent,
     ToolCallEvent, ToolResultEvent,
-    AutoRetryStartEvent, AutoRetryEndEvent,
-    AutoCompactionStartEvent, AutoCompactionEndEvent,
 )
 from mypi.core.session_manager import SessionManager, SessionEntry
 from mypi.extensions.base import Extension
@@ -40,7 +38,7 @@ class AgentSession:
         self.compaction_threshold = compaction_threshold
         self.max_retries = max_retries
         self._context_window = context_window
-        self._total_input_tokens: int = 0
+        self._last_input_tokens: int = 0
         self._is_idle = True
         self._in_flight_tool: str | None = None
         self._steer_override: str | None = None
@@ -56,6 +54,8 @@ class AgentSession:
         return self._is_idle
 
     async def prompt(self, text: str) -> None:
+        if not self._is_idle:
+            raise RuntimeError("Cannot prompt while a turn is already in progress")
         self._is_idle = False
         try:
             self.session_manager.append(SessionEntry(type="message", data={"role": "user", "content": text}))
@@ -97,7 +97,7 @@ class AgentSession:
                 await self._stream_turn(evt, params_evt)
                 return
             except Exception as e:
-                if attempt >= self.max_retries - 1:
+                if attempt == self.max_retries - 1:
                     if self.on_error:
                         self.on_error(f"Failed after {self.max_retries} attempts: {e}")
                     raise
@@ -162,8 +162,8 @@ class AgentSession:
                 })
 
             elif isinstance(event, DoneEvent):
-                self._total_input_tokens = event.usage.input_tokens
-                if self._total_input_tokens > self._context_window * self.compaction_threshold:
+                self._last_input_tokens = event.usage.input_tokens
+                if self._last_input_tokens > self._context_window * self.compaction_threshold:
                     await self._run_auto_compaction()
 
         # Persist assistant message
@@ -179,6 +179,7 @@ class AgentSession:
                       "name": tc["name"], "content": tc["result"]},
             ))
 
+    # AutoCompactionStartEvent/AutoCompactionEndEvent are dispatched by TUI layer
     async def _run_auto_compaction(self) -> None:
         """Summarize current context and store a CompactionEntry."""
         context = self.session_manager.build_context()

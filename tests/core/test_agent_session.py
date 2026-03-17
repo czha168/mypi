@@ -73,7 +73,6 @@ async def test_prompt_stores_messages_in_session(tmp_sessions_dir):
     assert any(m.get("content") == "hello" for m in ctx)
 
 
-# Append to tests/core/test_agent_session.py
 from unittest.mock import patch
 
 
