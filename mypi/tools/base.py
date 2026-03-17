@@ -9,7 +9,7 @@ from mypi.core.events import ToolCallEvent, ToolResultEvent
 class ToolResult:
     output: str = ""
     error: str | None = None
-    metadata: dict = field(default_factory=dict)
+    metadata: dict[str, object] = field(default_factory=dict)
 
     def to_message_content(self) -> str:
         if self.error:
@@ -70,6 +70,11 @@ class ToolRegistry:
         self._tools[tool.name] = tool
 
     def wrap(self, tool: Tool, runner: ExtensionRunner) -> Tool:
+        """Wrap a registered tool with extension interception.
+
+        Replaces the tool in the registry with a wrapped version.
+        Calling wrap() twice on the same tool name overwrites the first wrapper.
+        """
         wrapped = _WrappedTool(tool, runner)
         self._tools[tool.name] = wrapped
         return wrapped
