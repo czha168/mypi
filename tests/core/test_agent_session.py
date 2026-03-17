@@ -111,11 +111,17 @@ async def test_prompt_raises_after_max_retries(tmp_sessions_dir):
     provider.stream = always_fail
     sm = SessionManager(tmp_sessions_dir)
     sm.new_session(model="gpt-4o")
+
+    errors_received = []
     session = AgentSession(provider=provider, session_manager=sm, model="gpt-4o", max_retries=2)
+    session.on_error = lambda msg: errors_received.append(msg)
 
     with patch("asyncio.sleep", new_callable=AsyncMock):
         with pytest.raises(Exception, match="always fails"):
             await session.prompt("fail")
+
+    assert len(errors_received) == 1
+    assert "always fails" in errors_received[0]
 
 
 @pytest.mark.asyncio

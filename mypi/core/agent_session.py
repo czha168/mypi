@@ -92,17 +92,17 @@ class AgentSession:
             if result is not None:
                 params_evt = result
 
-        for attempt in range(1, self.max_retries + 1):
+        for attempt in range(self.max_retries):
             try:
                 await self._stream_turn(evt, params_evt)
                 return
             except Exception as e:
-                if attempt >= self.max_retries:
+                if attempt >= self.max_retries - 1:
                     if self.on_error:
                         self.on_error(f"Failed after {self.max_retries} attempts: {e}")
                     raise
                 delay = 2 ** attempt
-                logger.warning(f"Retrying (attempt {attempt}/{self.max_retries}) after {delay}s: {e}")
+                logger.warning(f"Retrying (attempt {attempt + 1}/{self.max_retries}) after {delay}s: {e}")
                 await asyncio.sleep(delay)
 
     async def _stream_turn(self, start_evt: BeforeAgentStartEvent, params_evt: BeforeProviderRequestEvent) -> None:
