@@ -90,27 +90,6 @@ async def _run(args: argparse.Namespace) -> None:
 
     all_extensions = [SkillExtension()] + extensions
 
-    # Wrap registry tools with extension runner
-    class SimpleRunner:
-        def __init__(self, exts):
-            self._exts = exts
-        async def fire_tool_call(self, event):
-            for ext in self._exts:
-                r = await ext.on_tool_call(event)
-                if r is not None:
-                    event = r
-            return event
-        async def fire_tool_result(self, event):
-            for ext in self._exts:
-                r = await ext.on_tool_result(event)
-                if r is not None:
-                    event = r
-            return event
-
-    runner = SimpleRunner(all_extensions)
-    for tool in list(registry.all_tools()):
-        registry.wrap(tool, runner)
-
     model = config.provider.model
     session_id = getattr(sm, '_session_id', None) or "unknown"
 

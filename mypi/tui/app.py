@@ -24,7 +24,6 @@ class TUIApp:
 
         # Use no-ops for unset callbacks
         kb = make_keybindings(
-            on_submit=on_submit or (lambda t: None),
             on_follow_up=on_follow_up or (lambda t: None),
             on_cancel=on_cancel or (lambda: None),
             on_clear=on_clear or (lambda: None),

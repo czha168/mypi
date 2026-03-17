@@ -4,20 +4,12 @@ from prompt_toolkit.key_binding import KeyBindings
 
 
 def make_keybindings(
-    on_submit,
     on_follow_up,
     on_cancel,
     on_clear,
     on_checkpoint,
 ) -> KeyBindings:
     kb = KeyBindings()
-
-    @kb.add("enter")
-    def submit(event):
-        buf = event.app.current_buffer
-        text = buf.text
-        buf.reset()
-        on_submit(text)
 
     @kb.add("escape", "enter")  # Alt+Enter
     def follow_up(event):
