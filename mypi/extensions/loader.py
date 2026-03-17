@@ -3,6 +3,7 @@ import importlib.util
 import inspect
 import logging
 import sys
+from collections.abc import Callable
 from pathlib import Path
 from mypi.extensions.base import Extension
 
@@ -24,7 +25,7 @@ class ExtensionLoader:
             self._load_file(py_file)
         return self.extensions
 
-    def start_watching(self, on_idle: "Callable[[], bool]") -> None:
+    def start_watching(self, on_idle: Callable[[], bool]) -> None:
         """Start watchdog observer. Hot-reload is deferred until on_idle() returns True."""
         try:
             from watchdog.observers import Observer

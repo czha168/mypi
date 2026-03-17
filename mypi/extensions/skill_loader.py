@@ -10,9 +10,13 @@ def _parse_skill(path: Path) -> dict | None:
     if not text.startswith("---"):
         return None
     try:
-        end = text.index("---", 3)
-        frontmatter = yaml.safe_load(text[3:end])
-        body = text[end + 3:].strip()
+        # Find the closing delimiter on its own line
+        close_idx = text.find("\n---", 3)
+        if close_idx == -1:
+            return None
+        frontmatter_text = text[3:close_idx]
+        frontmatter = yaml.safe_load(frontmatter_text)
+        body = text[close_idx + 4:].strip()  # skip "\n---"
         if not isinstance(frontmatter, dict) or "name" not in frontmatter:
             return None
         return {"name": frontmatter["name"], "description": frontmatter.get("description", ""),

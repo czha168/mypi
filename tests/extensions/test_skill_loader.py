@@ -35,8 +35,8 @@ def test_skill_loader_ignores_invalid_frontmatter(tmp_skills_dir):
     loader = SkillLoader(skills_dirs=[tmp_skills_dir])
     evt = BeforeAgentStartEvent(system_prompt="Base.", messages=[])
     modified = loader.inject_skills(evt)
-    # Should not crash, may or may not inject (graceful)
-    assert modified is not None
+    assert modified.system_prompt == "Base."
+    assert "No frontmatter here" not in modified.system_prompt
 
 
 def test_skill_loader_scans_multiple_dirs(tmp_path):
