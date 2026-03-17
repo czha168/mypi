@@ -1,11 +1,14 @@
 from __future__ import annotations
 import asyncio
 import json
+import logging
 import sys
 from mypi.core.agent_session import AgentSession
 from mypi.core.session_manager import SessionManager
 from mypi.ai.provider import LLMProvider
 from mypi.tools.base import ToolRegistry
+
+logger = logging.getLogger(__name__)
 
 
 class RPCMode:
@@ -38,13 +41,14 @@ class RPCMode:
     async def run(self, reader: asyncio.StreamReader | None = None) -> None:
         if reader is None:
             reader = asyncio.StreamReader()
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
             loop.add_reader(sys.stdin.fileno(), lambda: reader.feed_data(sys.stdin.buffer.read1()))
 
         while True:
             try:
                 line = await reader.readline()
-            except Exception:
+            except Exception as e:
+                logger.warning(f"RPC reader error: {e}")
                 break
             if not line:
                 break

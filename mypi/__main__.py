@@ -9,6 +9,7 @@ from mypi.tools.builtins import make_builtin_registry
 from mypi.extensions.loader import ExtensionLoader
 from mypi.extensions.skill_loader import SkillLoader
 from mypi.core.events import BeforeAgentStartEvent
+from mypi.extensions.base import Extension
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -82,18 +83,10 @@ async def _run(args: argparse.Namespace) -> None:
         skills_dirs += [Path(d) for d in args.skills_dirs]
     skill_loader = SkillLoader(skills_dirs=skills_dirs)
 
-    class SkillExtension:
+    class SkillExtension(Extension):
         name = "skill-loader"
         async def on_before_agent_start(self, event: BeforeAgentStartEvent):
             return skill_loader.inject_skills(event)
-        async def on_before_provider_request(self, event): return None
-        async def on_tool_call(self, event): return None
-        async def on_tool_result(self, event): return None
-        async def on_session_fork(self, event): pass
-        async def on_session_tree(self, event): pass
-        def get_tools(self): return []
-        def get_shortcuts(self): return {}
-        def get_ui_components(self): return None
 
     all_extensions = [SkillExtension()] + extensions
 
@@ -119,7 +112,7 @@ async def _run(args: argparse.Namespace) -> None:
         registry.wrap(tool, runner)
 
     model = config.provider.model
-    session_id = sm._session_id or "unknown"
+    session_id = getattr(sm, '_session_id', None) or "unknown"
 
     if args.print_prompt:
         from mypi.modes.print_mode import PrintMode

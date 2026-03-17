@@ -19,7 +19,13 @@ class InteractiveMode:
         system_prompt: str | None = None,
     ):
         self._session_manager = session_manager
-        self._app = TUIApp(model=model, session_id=session_id)
+        self._app = TUIApp(
+            model=model,
+            session_id=session_id,
+            on_cancel=lambda: None,  # handled by KeyboardInterrupt
+            on_clear=lambda: None,
+            on_checkpoint=lambda: None,
+        )
         self._follow_up_queue: list[str] = []
         self._is_running = True
 
@@ -48,7 +54,7 @@ class InteractiveMode:
             if not text.strip():
                 continue
             self._app.renderer.render_user_message(text)
-            self._session.on_token = lambda t: self._app.renderer.append_token(t)
+            self._app.renderer.start_turn()  # Reset buffer for new turn
             await self._session.prompt(text)
             self._app.renderer.end_turn()
 
