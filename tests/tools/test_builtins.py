@@ -1,6 +1,6 @@
 import pytest
 from pathlib import Path
-from mypi.tools.builtins import ReadTool, WriteTool, EditTool
+from mypi.tools.builtins import ReadTool, WriteTool, EditTool, BashTool, FindTool, GrepTool, LsTool
 from mypi.tools.base import ToolResult
 
 
@@ -69,9 +69,6 @@ async def test_edit_tool_fails_if_not_found(tmp_path):
     tool = EditTool()
     result = await tool.execute(path=str(f), old_string="y = 99", new_string="y = 0")
     assert result.error is not None
-
-
-from mypi.tools.builtins import BashTool, FindTool, GrepTool, LsTool
 
 
 @pytest.mark.asyncio

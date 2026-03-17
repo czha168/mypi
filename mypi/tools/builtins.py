@@ -24,7 +24,7 @@ class ReadTool(Tool):
         try:
             lines = Path(path).read_text().splitlines()
             start = max(0, offset - 1)
-            end = start + limit if limit else len(lines)
+            end = start + limit if limit is not None else len(lines)
             selected = lines[start:end]
             return ToolResult(output="\n".join(selected))
         except FileNotFoundError:
@@ -50,7 +50,7 @@ class WriteTool(Tool):
             p = Path(path)
             p.parent.mkdir(parents=True, exist_ok=True)
             p.write_text(content)
-            return ToolResult(output=f"Written {len(content)} bytes to {path}")
+            return ToolResult(output=f"Written {len(content)} characters to {path}")
         except Exception as e:
             return ToolResult(error=str(e))
 
@@ -108,6 +108,7 @@ class BashTool(Tool):
                 stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=timeout)
             except asyncio.TimeoutError:
                 proc.kill()
+                await proc.wait()  # reap process and drain pipe
                 return ToolResult(error=f"Command timeout after {timeout}s")
             output = stdout.decode(errors="replace")
             if proc.returncode != 0:
