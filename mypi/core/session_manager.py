@@ -2,6 +2,7 @@ from __future__ import annotations
 import json
 import uuid
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -19,6 +20,7 @@ class SessionEntry:
 
     @classmethod
     def from_dict(cls, d: dict) -> SessionEntry:
+        d = dict(d)  # don't mutate caller's dict
         entry_id = d.pop("id", None) or str(uuid.uuid4())
         parent_id = d.pop("parentId", None)
         entry_type = d.pop("type")
@@ -63,6 +65,11 @@ class SessionManager:
         self._active_leaf_id = leaf_ids[-1] if leaf_ids else (self._entries[-1].id if self._entries else None)
 
     def append(self, entry: SessionEntry) -> SessionEntry:
+        """Append entry as a child of the current active leaf.
+
+        Note: entry.parent_id is always set to the current active leaf id,
+        overwriting any parent_id the caller may have set.
+        """
         entry.parent_id = self._active_leaf_id
         self._write_entry(entry)
         return entry
@@ -131,13 +138,10 @@ class SessionManager:
         if not self._entries:
             return
         first = self._entries[0]
-        version = first.data.get("version", 1)
-        if version < 2:
+        if first.data.get("version", 1) < 2:
             self._migrate_v1_to_v2()
-            first.data["version"] = 2
-        if version < 3:
+        if first.data.get("version", 1) < 3:
             self._migrate_v2_to_v3()
-            first.data["version"] = 3
 
     def _migrate_v1_to_v2(self) -> None:
         """Add id/parentId tree structure."""
@@ -166,5 +170,4 @@ class SessionManager:
                 f.write(entry.to_jsonl() + "\n")
 
     def _now(self) -> str:
-        from datetime import datetime, timezone
         return datetime.now(timezone.utc).isoformat()
