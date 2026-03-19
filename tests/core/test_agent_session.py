@@ -33,14 +33,20 @@ async def test_prompt_fires_token_events(tmp_sessions_dir):
 
 @pytest.mark.asyncio
 async def test_prompt_executes_tool_calls(tmp_sessions_dir):
-    tool_events = [
-        LLMToolCallEvent(id="c1", name="echo", arguments={"text": "from tool"}),
-        DoneEvent(usage=TokenUsage(10, 5)),
-    ]
-    provider = make_mock_provider(tool_events)
-    sm = SessionManager(tmp_sessions_dir)
-    sm.new_session(model="gpt-4o")
-
+    call_count = 0
+    
+    async def provider_stream(*args, **kwargs):
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            # First call: LLM requests tool call
+            yield LLMToolCallEvent(id="c1", name="echo", arguments={"text": "from tool"})
+            yield DoneEvent(usage=TokenUsage(10, 5))
+        else:
+            # Second call: LLM continues after tool result
+            yield TokenEvent(text="Tool result received: ")
+            yield DoneEvent(usage=TokenUsage(50, 10))
+    
     from mypi.tools.base import Tool, ToolResult, ToolRegistry
     class EchoTool(Tool):
         name = "echo"
@@ -51,6 +57,11 @@ async def test_prompt_executes_tool_calls(tmp_sessions_dir):
 
     registry = ToolRegistry()
     registry.register(EchoTool())
+    
+    provider = MagicMock()
+    provider.stream = provider_stream
+    sm = SessionManager(tmp_sessions_dir)
+    sm.new_session(model="gpt-4o")
     session = AgentSession(provider=provider, session_manager=sm, model="gpt-4o", tool_registry=registry)
 
     tool_results = []
@@ -58,6 +69,7 @@ async def test_prompt_executes_tool_calls(tmp_sessions_dir):
 
     await session.prompt("use echo")
     assert any(r[0] == "echo" and r[1].output == "from tool" for r in tool_results)
+    assert call_count == 2  # Should make 2 calls: initial + after tool result
 
 
 @pytest.mark.asyncio

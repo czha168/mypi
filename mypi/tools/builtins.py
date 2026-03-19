@@ -197,11 +197,11 @@ class GrepTool(Tool):
 
 class LsTool(Tool):
     name = "ls"
-    description = "List directory contents with file metadata."
+    description = "List directory contents with file metadata. Use '.' for current directory."
     input_schema = {
         "type": "object",
         "properties": {
-            "path": {"type": "string", "description": "Directory to list"},
+            "path": {"type": "string", "description": "Directory to list (use '.' for current directory)"},
         },
         "required": ["path"],
     }

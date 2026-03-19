@@ -47,10 +47,19 @@ async def test_print_mode_shows_tool_calls(tmp_sessions_dir):
     registry = ToolRegistry()
     registry.register(EchoTool())
 
-    provider = make_mock_provider([
-        LLMToolCallEvent(id="c1", name="echo", arguments={"text": "hi"}),
-        DoneEvent(usage=TokenUsage(10, 5)),
-    ])
+    call_count = 0
+    async def provider_stream(*args, **kwargs):
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            yield LLMToolCallEvent(id="c1", name="echo", arguments={"text": "hi"})
+            yield DoneEvent(usage=TokenUsage(10, 5))
+        else:
+            yield TokenEvent(text="Tool result: ")
+            yield DoneEvent(usage=TokenUsage(50, 10))
+
+    provider = MagicMock()
+    provider.stream = provider_stream
     sm = SessionManager(tmp_sessions_dir)
     sm.new_session(model="gpt-4o")
 

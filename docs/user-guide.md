@@ -354,11 +354,11 @@ Returns matches in `file:line: content` format.
 
 ### `ls`
 
-List directory contents with metadata.
+List directory contents with metadata. Use `.` for the current directory.
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|
-| `path` | string | yes | Directory to list |
+| `path` | string | yes | Directory to list (use `.` for current directory) |
 
 Returns each entry with its type (`file`/`dir`), size in bytes, modification timestamp, and name.
 

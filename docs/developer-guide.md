@@ -90,9 +90,10 @@ A single conversation turn proceeds as follows:
    c. Fires `ToolResultEvent` through extensions (extensions may modify the result).
    d. Calls `on_tool_result` callback.
    e. Stores the tool call and result for inclusion in the assistant message.
-7. On `DoneEvent`, AgentSession checks if token usage exceeds the compaction threshold and runs auto-compaction if needed.
-8. AgentSession appends `assistant` and `tool` messages to `SessionManager`.
-9. **Mode layer** signals completion to the user.
+7. **Multi-turn tool calling**: If any tool calls were made, AgentSession appends the assistant message with `tool_calls` and all tool result messages back to the message list, then makes another LLM request to continue generation. This repeats until no more tool calls are requested.
+8. On final `DoneEvent`, AgentSession checks if token usage exceeds the compaction threshold and runs auto-compaction if needed.
+9. AgentSession appends `assistant` and `tool` messages to `SessionManager`.
+10. **Mode layer** signals completion to the user.
 
 ---
 
@@ -856,10 +857,30 @@ tests/
 │   ├── test_base.py          # Extension ABC tests
 │   ├── test_loader.py        # ExtensionLoader tests
 │   └── test_skill_loader.py  # SkillLoader and frontmatter parsing tests
-└── modes/
-    ├── test_print_mode.py
-    ├── test_rpc.py
-    └── test_sdk.py
+├── modes/
+│   ├── test_print_mode.py
+│   ├── test_rpc.py
+│   └── test_sdk.py
+└── integration/
+    └── test_real_llm.py      # Integration tests against real LLM endpoints
 ```
 
 All tests are async-compatible via `pytest-asyncio` with `asyncio_mode = "auto"`. You do not need to decorate individual test functions with `@pytest.mark.asyncio`.
+
+**Integration tests:**
+
+Integration tests in `tests/integration/` run against a real LLM endpoint. They are skipped automatically if `OPENAI_API_KEY` is not set.
+
+```bash
+# Run all tests (integration tests skipped if no API key)
+pytest
+
+# Run only integration tests
+pytest tests/integration/
+
+# Run with specific API endpoint
+OPENAI_API_KEY="your-key" \
+OPENAI_BASE_URL="http://localhost:8000/v1" \
+OPENAI_MODEL="your-model" \
+pytest tests/integration/test_real_llm.py -v
+```

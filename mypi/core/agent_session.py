@@ -1,5 +1,6 @@
 from __future__ import annotations
 import asyncio
+import json
 import logging
 from collections.abc import Callable
 from mypi.ai.provider import LLMProvider, TokenEvent, LLMToolCallEvent, DoneEvent
@@ -106,78 +107,121 @@ class AgentSession:
                 await asyncio.sleep(delay)
 
     async def _stream_turn(self, start_evt: BeforeAgentStartEvent, params_evt: BeforeProviderRequestEvent) -> None:
-        assistant_content = []
-        tool_calls_made = []
+        # Messages to send to LLM - start with context
+        messages = list(start_evt.messages)
+        assistant_content: list[str] = []
+        pending_assistant_msg: dict | None = None
 
-        async for event in self.provider.stream(
-            messages=start_evt.messages,
-            tools=self.tool_registry.to_openai_schema(),
-            model=self.model,
-            system=start_evt.system_prompt,
-            **params_evt.params,
-        ):
-            if isinstance(event, TokenEvent):
-                assistant_content.append(event.text)
-                if self.on_token:
-                    self.on_token(event.text)
+        while True:
+            tool_calls_this_round: list[dict] = []
+            tool_results: list[dict] = []
 
-            elif isinstance(event, LLMToolCallEvent):
-                call_evt = ToolCallEvent(tool_name=event.name, arguments=event.arguments)
-                for ext in self.extensions:
-                    result = await ext.on_tool_call(call_evt)
-                    if result is not None:
-                        call_evt = result
+            async for event in self.provider.stream(
+                messages=messages,
+                tools=self.tool_registry.to_openai_schema(),
+                model=self.model,
+                system=start_evt.system_prompt,
+                **params_evt.params,
+            ):
+                if isinstance(event, TokenEvent):
+                    assistant_content.append(event.text)
+                    if self.on_token:
+                        self.on_token(event.text)
 
-                if self.on_tool_call:
-                    self.on_tool_call(call_evt.tool_name, call_evt.arguments)
+                elif isinstance(event, LLMToolCallEvent):
+                    # Track tool call in assistant message
+                    if pending_assistant_msg is None:
+                        pending_assistant_msg = {
+                            "role": "assistant",
+                            "content": "",
+                            "tool_calls": []
+                        }
+                    pending_assistant_msg["tool_calls"].append({
+                        "id": event.id,
+                        "type": "function",
+                        "function": {
+                            "name": event.name,
+                            "arguments": ""
+                        }
+                    })
+                    # Accumulate function arguments (may come in multiple chunks)
+                    # Find and update the tool_call
+                    for tc in pending_assistant_msg["tool_calls"]:
+                        if tc["id"] == event.id:
+                            tc["function"]["arguments"] += json.dumps(event.arguments) if event.arguments else ""
 
-                self._in_flight_tool = call_evt.tool_name
-                self._steer_override = None
+                    call_evt = ToolCallEvent(tool_name=event.name, arguments=event.arguments)
+                    for ext in self.extensions:
+                        result = await ext.on_tool_call(call_evt)
+                        if result is not None:
+                            call_evt = result
 
-                tool = self.tool_registry.get(call_evt.tool_name)
-                if tool:
-                    tool_result = await tool.execute(**call_evt.arguments)
-                else:
-                    tool_result = ToolResult(error=f"Unknown tool: {call_evt.tool_name}")
+                    if self.on_tool_call:
+                        self.on_tool_call(call_evt.tool_name, call_evt.arguments)
 
-                if self._steer_override is not None:
-                    tool_result = ToolResult(output=self._steer_override)
+                    self._in_flight_tool = call_evt.tool_name
                     self._steer_override = None
 
-                self._in_flight_tool = None
+                    tool = self.tool_registry.get(call_evt.tool_name)
+                    if tool:
+                        tool_result = await tool.execute(**call_evt.arguments)
+                    else:
+                        tool_result = ToolResult(error=f"Unknown tool: {call_evt.tool_name}")
 
-                result_evt = ToolResultEvent(tool_name=call_evt.tool_name, result=tool_result)
-                for ext in self.extensions:
-                    r = await ext.on_tool_result(result_evt)
-                    if r is not None:
-                        result_evt = r
+                    if self._steer_override is not None:
+                        tool_result = ToolResult(output=self._steer_override)
+                        self._steer_override = None
 
-                if self.on_tool_result:
-                    self.on_tool_result(result_evt.tool_name, result_evt.result)
+                    self._in_flight_tool = None
 
-                tool_calls_made.append({
-                    "id": event.id,
-                    "name": result_evt.tool_name,
-                    "result": result_evt.result.to_message_content(),
-                })
+                    result_evt = ToolResultEvent(tool_name=call_evt.tool_name, result=tool_result)
+                    for ext in self.extensions:
+                        r = await ext.on_tool_result(result_evt)
+                        if r is not None:
+                            result_evt = r
 
-            elif isinstance(event, DoneEvent):
-                self._last_input_tokens = event.usage.input_tokens
-                if self._last_input_tokens > self._context_window * self.compaction_threshold:
-                    await self._run_auto_compaction()
+                    if self.on_tool_result:
+                        self.on_tool_result(result_evt.tool_name, result_evt.result)
+
+                    tool_results.append({
+                        "role": "tool",
+                        "tool_call_id": event.id,
+                        "content": result_evt.result.to_message_content(),
+                    })
+
+                elif isinstance(event, DoneEvent):
+                    self._last_input_tokens = event.usage.input_tokens
+
+            # If we had tool calls, append them and continue
+            if pending_assistant_msg and tool_results:
+                # Complete the pending assistant message
+                pending_assistant_msg["content"] = "".join(assistant_content)
+                messages.append(pending_assistant_msg)
+                messages.extend(tool_results)
+                # Reset for next round
+                assistant_content = []
+                pending_assistant_msg = None
+                # Continue loop to get next response from LLM
+                continue
+
+            # No more tool calls - we're done
+            break
 
         # Persist assistant message
-        if assistant_content:
+        if assistant_content or pending_assistant_msg:
+            if pending_assistant_msg:
+                pending_assistant_msg["content"] = "".join(assistant_content)
+                msg_content = pending_assistant_msg["content"]
+            else:
+                msg_content = "".join(assistant_content)
             self.session_manager.append(SessionEntry(
                 type="message",
-                data={"role": "assistant", "content": "".join(assistant_content)},
+                data={"role": "assistant", "content": msg_content},
             ))
-        for tc in tool_calls_made:
-            self.session_manager.append(SessionEntry(
-                type="message",
-                data={"role": "tool", "tool_call_id": tc["id"],
-                      "name": tc["name"], "content": tc["result"]},
-            ))
+
+        # Check compaction after the final response
+        if self._last_input_tokens > self._context_window * self.compaction_threshold:
+            await self._run_auto_compaction()
 
     # AutoCompactionStartEvent/AutoCompactionEndEvent are dispatched by TUI layer
     async def _run_auto_compaction(self) -> None:

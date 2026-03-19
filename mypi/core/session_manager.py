@@ -121,7 +121,22 @@ class SessionManager:
             elif entry.type == "message":
                 role = entry.data.get("role", "user")
                 content = entry.data.get("content", "")
-                messages.append({"role": role, "content": content})
+                if role == "tool":
+                    # Tool messages require tool_call_id and name fields
+                    messages.append({
+                        "role": role,
+                        "tool_call_id": entry.data.get("tool_call_id"),
+                        "name": entry.data.get("name"),
+                        "content": content,
+                    })
+                elif role == "assistant":
+                    # Assistant messages with tool_calls need to preserve that field
+                    msg = {"role": role, "content": content}
+                    if "tool_calls" in entry.data:
+                        msg["tool_calls"] = entry.data["tool_calls"]
+                    messages.append(msg)
+                else:
+                    messages.append({"role": role, "content": content})
         return messages
 
     @staticmethod

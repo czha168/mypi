@@ -25,7 +25,7 @@ from mypi.ai.openai_compat import OpenAICompatProvider
 async def test_openai_compat_streams_tokens():
     provider = OpenAICompatProvider(base_url="http://localhost", api_key="test", default_model="gpt-4o")
 
-    # Mock the openai client stream
+    # Mock the openai client stream - must be an async iterator
     chunk1 = MagicMock()
     chunk1.choices = [MagicMock(delta=MagicMock(content="Hello", tool_calls=None))]
     chunk1.usage = None
@@ -34,8 +34,12 @@ async def test_openai_compat_streams_tokens():
     final_chunk.choices = [MagicMock(delta=MagicMock(content=None, tool_calls=None))]
     final_chunk.usage = MagicMock(prompt_tokens=10, completion_tokens=5)
 
-    mock_stream = MagicMock()
-    mock_stream.__aiter__ = MagicMock(return_value=iter([chunk1, final_chunk]))
+    # Create an async iterator from the chunks
+    async def async_iter():
+        yield chunk1
+        yield final_chunk
+
+    mock_stream = async_iter()
 
     with patch.object(provider._client.chat.completions, "create", return_value=mock_stream):
         events = []
@@ -65,8 +69,11 @@ async def test_openai_compat_emits_tool_call():
     final_chunk.choices = [MagicMock(delta=MagicMock(content=None, tool_calls=None), finish_reason=None)]
     final_chunk.usage = MagicMock(prompt_tokens=20, completion_tokens=10)
 
-    mock_stream = MagicMock()
-    mock_stream.__aiter__ = MagicMock(return_value=iter([tool_chunk, final_chunk]))
+    async def async_iter():
+        yield tool_chunk
+        yield final_chunk
+
+    mock_stream = async_iter()
 
     with patch.object(provider._client.chat.completions, "create", return_value=mock_stream):
         events = []
