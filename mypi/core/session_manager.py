@@ -91,6 +91,10 @@ class SessionManager:
     def current_leaf_id(self) -> str | None:
         return self._active_leaf_id
 
+    @property
+    def session_id(self) -> str | None:
+        return self._session_id
+
     def load_all_entries(self) -> list[SessionEntry]:
         return list(self._entries)
 

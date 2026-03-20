@@ -221,6 +221,7 @@ mypi --rpc
 {"type": "steer", "text": "Focus on error handling only"}
 {"type": "follow_up", "text": "Now explain the tests"}
 {"type": "cancel"}
+{"type": "get-session-id"}
 {"type": "exit"}
 ```
 
@@ -234,11 +235,14 @@ mypi --rpc
 {"type": "error", "message": "Failed after 3 attempts: ..."}
 {"type": "done", "usage": {}}
 {"type": "cancelled"}
+{"type": "id", "id": "550e8400-e29b-41d4-a716-446655440000"}
 ```
 
 A `done` event is emitted after each `prompt`, `steer`, or `follow_up` command completes.
 
 **The `steer` command** injects a correction mid-turn. If a tool call is currently executing, its result is replaced with the steer text. If no tool call is in flight, steer behaves identically to `follow_up`.
+
+**The `get-session-id` command** returns the current session ID. It emits an `id` event with the session UUID.
 
 ### SDK mode
 
@@ -362,6 +366,18 @@ List directory contents with metadata. Use `.` for the current directory.
 
 Returns each entry with its type (`file`/`dir`), size in bytes, modification timestamp, and name.
 
+### `skill`
+
+Load a skill's full content by name. Call this when you want to apply a specific skill's instructions.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `name` | string | yes | Name of the skill to load |
+
+Example: `skill(name="commit-message")` returns the full body of the commit-message skill.
+
+The LLM sees skill names and descriptions at startup. This tool loads the full content when the LLM determines the skill is relevant.
+
 ---
 
 ## Skills
@@ -401,7 +417,7 @@ Always run the tests with `bash` tool after writing them to confirm they pass.
 
 ### Using skills
 
-Skills are loaded automatically at startup from `~/.mypi/skills/`. All `.md` files in the directory that have valid frontmatter are loaded and injected into the system prompt.
+Skills are loaded automatically at startup from `~/.mypi/skills/`. All `.md` files in the directory that have valid frontmatter are loaded.
 
 You can add extra skill directories:
 
@@ -411,7 +427,23 @@ mypi --skills-dir ./project-skills --skills-dir ~/shared-skills
 
 All directories are merged. The default `~/.mypi/skills/` is always included.
 
-Skills are injected once at the start of each turn under a "# Available Skills" heading in the system prompt. The LLM sees them as standing instructions, not as commands to execute immediately.
+**Lazy loading:** At startup, only skill metadata (name and description) is injected into the system prompt. This keeps the prompt lean. When the LLM determines a skill is relevant, it can invoke the `skill` tool to load the full content on-demand.
+
+Skills are injected once at the start of each turn under a "# Available Skills" heading in the system prompt:
+
+```
+# Available Skills
+
+## Skill: commit-message
+**When to use:** Write a git commit message after making code changes
+```
+
+The `skill` tool loads full content when called:
+
+```
+skill(name="commit-message")
+→ Returns the full skill body with all instructions
+```
 
 ---
 

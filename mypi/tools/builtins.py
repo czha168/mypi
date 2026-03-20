@@ -220,10 +220,13 @@ class LsTool(Tool):
             return ToolResult(error=str(e))
 
 
-def make_builtin_registry() -> "ToolRegistry":
-    """Create a ToolRegistry pre-populated with all 7 built-in tools."""
+def make_builtin_registry(skill_loader_getter=None) -> "ToolRegistry":
+    """Create a ToolRegistry pre-populated with all built-in tools."""
     from mypi.tools.base import ToolRegistry
     reg = ToolRegistry()
     for tool in [ReadTool(), WriteTool(), EditTool(), BashTool(), FindTool(), GrepTool(), LsTool()]:
         reg.register(tool)
+    if skill_loader_getter is not None:
+        from mypi.tools.skill_tool import SkillTool
+        reg.register(SkillTool(skill_loader_getter))
     return reg

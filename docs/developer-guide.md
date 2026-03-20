@@ -65,9 +65,9 @@
             └───────────────────┘   └────────────────────────┘
                             │
             ┌───────────────▼───────────────────────────────┐
-            │  mypi/tools/ToolRegistry                      │
-            │  read  write  edit  bash  find  grep  ls      │
-            └───────────────────────────────────────────────┘
+             │  mypi/tools/ToolRegistry                      │
+             │  read  write  edit  bash  find  grep  ls  skill │
+             └───────────────────────────────────────────────┘
                             │
             ┌───────────────▼───────────────────────────────┐
             │  mypi/extensions/                             │
@@ -155,9 +155,13 @@ Internal-only (not dispatched to extensions):
 - `ToolRegistry` — Holds named `Tool` instances. Methods: `register(tool)`, `get(name)`, `all_tools()`, `to_openai_schema()`.
 - `_WrappedTool` — Internal. Wraps a `Tool` with extension interception via `ExtensionRunner`. Created by `ToolRegistry.wrap()`.
 
-**`builtins.py`** — The seven built-in tools: `ReadTool`, `WriteTool`, `EditTool`, `BashTool`, `FindTool`, `GrepTool`, `LsTool`.
+**`builtins.py`** — The seven built-in tools: `ReadTool`, `WriteTool`, `EditTool`, `BashTool`, `FindTool`, `GrepTool`, `LsTool`, and `SkillTool`.
 
-- `make_builtin_registry()` — Convenience factory. Returns a `ToolRegistry` pre-populated with all seven tools.
+- `make_builtin_registry(skill_loader_getter=None)` — Convenience factory. Returns a `ToolRegistry` pre-populated with all eight tools. Pass a callable returning a `SkillLoader` instance to enable the `skill` tool.
+
+**`skill_tool.py`** — On-demand skill content loading.
+
+- `SkillTool(skill_loader_getter)` — Tool that loads full skill content by name. Accepts a getter function returning the `SkillLoader` instance.
 
 ### mypi/extensions/
 
@@ -175,9 +179,11 @@ Internal-only (not dispatched to extensions):
 
 **`skill_loader.py`** — Skill file loading and injection.
 
+- `Skill(skills_dirs)` — Dataclass representing a skill with `name`, `description`, `file_path`, `compatibility`, and optional `body`.
 - `SkillLoader(skills_dirs)` — Scans multiple directories for `.md` skill files with YAML frontmatter.
-- `SkillLoader.load_skills()` — Returns a list of parsed skill dicts.
-- `SkillLoader.inject_skills(event: BeforeAgentStartEvent)` — Appends all loaded skills to the system prompt in a "# Available Skills" section. Returns the modified event.
+- `SkillLoader.load_skills_metadata()` — Returns a list of `Skill` objects with metadata only (name, description). Used for system prompt injection.
+- `SkillLoader.load_skill_content(name)` — Returns a `Skill` with full body content for a specific skill. Used for on-demand loading.
+- `SkillLoader.inject_skills(event: BeforeAgentStartEvent)` — Appends skill metadata to the system prompt in a "# Available Skills" section. Full content is loaded via the `skill` tool instead.
 
 ### mypi/tui/
 
@@ -394,7 +400,7 @@ class StatusExtension(Extension):
 
 ## Skill Format
 
-Skills are `.md` files with YAML frontmatter. They are loaded from `~/.mypi/skills/` (and any additional `--skills-dir` directories) and injected into the system prompt at the start of every turn.
+Skills are `.md` files with YAML frontmatter. They are loaded from `~/.mypi/skills/` (and any additional `--skills-dir` directories).
 
 **File format:**
 
@@ -427,9 +433,9 @@ Run `git diff --staged` first to review what is staged.
 Use `bash` to run `git commit -m "..."` to apply.
 ```
 
-**How injection works:**
+**How injection works (lazy loading):**
 
-`SkillLoader.inject_skills()` appends the following block to the system prompt:
+At startup, `SkillLoader.inject_skills()` appends only the metadata to the system prompt:
 
 ```
 ---
@@ -438,13 +444,13 @@ Use `bash` to run `git commit -m "..."` to apply.
 ## Skill: <name>
 **When to use:** <description>
 
-<body>
-
 ## Skill: <name2>
 ...
 ```
 
-The LLM sees skills as standing instructions. Skills do not create commands or slash-commands; they are instructional text that the LLM can follow when it judges them relevant.
+The body content is **not** included in the system prompt. When the LLM determines a skill is relevant, it calls the `skill` tool with the skill name, and `SkillLoader.load_skill_content()` returns the full body.
+
+This keeps the system prompt lean while still making skill instructions available when needed.
 
 **Parser behaviour:**
 
@@ -488,6 +494,12 @@ If a tool call is currently executing, its result is replaced by the steer text.
 
 ```json
 {"type": "cancel"}
+```
+
+**`get-session-id`** — Get the current session ID. Emits an `id` event.
+
+```json
+{"type": "get-session-id"}
 ```
 
 **`exit`** — Cleanly shut down the RPC process.
@@ -536,6 +548,12 @@ Events are emitted to mypi's stdout.
 
 ```json
 {"type": "cancelled"}
+```
+
+**`id`** — Response to `get-session-id` command. Contains the current session UUID.
+
+```json
+{"type": "id", "id": "550e8400-e29b-41d4-a716-446655440000"}
 ```
 
 **Sequence diagram for a single prompt:**

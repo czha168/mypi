@@ -75,5 +75,7 @@ class RPCMode:
                 self._emit({"type": "cancelled"})
             elif cmd_type == "exit":
                 break
+            elif cmd_type == "get-session-id":
+                self._emit({"type": "id", "id": self._session.session_manager.session_id or ""})
             else:
                 self._emit({"type": "error", "message": f"Unknown command: {cmd_type}"})

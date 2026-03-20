@@ -70,19 +70,20 @@ async def _run(args: argparse.Namespace) -> None:
     else:
         sm.new_session(model=config.provider.model)
 
-    # Tools
-    registry = make_builtin_registry()
-
-    # Extensions
-    ext_loader = ExtensionLoader(extensions_dir=config.paths.extensions_dir)
-    extensions = ext_loader.load()
-
-    # Skills — inject via a synthetic extension
+    # Skills — create loader first so we can pass getter to tools
     skills_dirs = [config.paths.skills_dir]
     if args.skills_dirs:
         skills_dirs += [Path(d) for d in args.skills_dirs]
     skill_loader = SkillLoader(skills_dirs=skills_dirs)
 
+    # Tools — include skill tool with lazy loader reference
+    registry = make_builtin_registry(skill_loader_getter=lambda: skill_loader)
+
+    # Extensions
+    ext_loader = ExtensionLoader(extensions_dir=config.paths.extensions_dir)
+    extensions = ext_loader.load()
+
+    # Skills — inject via a synthetic extension (metadata only, full content on-demand)
     class SkillExtension(Extension):
         name = "skill-loader"
         async def on_before_agent_start(self, event: BeforeAgentStartEvent):

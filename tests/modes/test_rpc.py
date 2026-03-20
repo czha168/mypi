@@ -39,3 +39,25 @@ async def test_rpc_mode_emits_token_jsonl(tmp_sessions_dir, capsys):
     types = [json.loads(l)["type"] for l in lines]
     assert "token" in types
     assert "done" in types
+
+
+@pytest.mark.asyncio
+async def test_rpc_get_session_id(tmp_sessions_dir, capsys):
+    sm = SessionManager(tmp_sessions_dir)
+    sm.new_session(model="gpt-4o")
+    expected_id = sm.session_id
+
+    stdin_data = json.dumps({"type": "get-session-id"}) + "\n"
+    stdin_data += json.dumps({"type": "exit"}) + "\n"
+    stdin = asyncio.StreamReader()
+    stdin.feed_data(stdin_data.encode())
+    stdin.feed_eof()
+
+    provider = make_mock_provider([])
+    mode = RPCMode(provider=provider, session_manager=sm, model="gpt-4o")
+    await mode.run(reader=stdin)
+
+    captured = capsys.readouterr()
+    lines = [json.loads(l) for l in captured.out.strip().split("\n") if l]
+    assert lines[0]["type"] == "id"
+    assert lines[0]["id"] == expected_id
