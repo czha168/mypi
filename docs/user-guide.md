@@ -17,7 +17,14 @@
 6. [Skills](#skills)
    - [Creating a skill](#creating-a-skill)
    - [Using skills](#using-skills)
-7. [Session Management](#session-management)
+   - [Workflow skills and the template system](#workflow-skills-and-the-template-system)
+7. [Template Generation](#template-generation)
+   - [Command files for Claude Code, Cursor, and Windsurf](#command-files-for-claude-code-cursor-and-windsurf)
+8. [OpenSpec Core Profile](#openspec-core-profile)
+   - [The four commands](#the-four-commands)
+   - [How it works](#how-it-works)
+   - [Example session](#example-session)
+9. [Session Management](#session-management)
    - [How sessions work](#how-sessions-work)
    - [Resuming a session](#resuming-a-session)
    - [Branches](#branches)
@@ -443,6 +450,178 @@ The `skill` tool loads full content when called:
 ```
 skill(name="commit-message")
 → Returns the full skill body with all instructions
+```
+
+### Workflow skills and the template system
+
+Skills with `workflow:` frontmatter are treated as **workflow skills**. The template system reads them and generates slash command files for external AI tools (Claude Code, Cursor, Windsurf).
+
+```markdown
+---
+name: opsx-propose
+description: Propose a new change - create it and generate all artifacts
+category: Workflow
+tags: [openspec, change]
+workflow: opsx-propose       # Marks this as a workflow skill
+command_id: opsx-propose    # Output filename for command generation
+---
+
+Propose a new change...
+```
+
+Two metadata fields enable workflow skills:
+
+| Field | Purpose |
+|---|---|
+| `workflow` | Identifies the skill as a workflow skill (template system reads this key) |
+| `command_id` | The filename for the generated command file (e.g., `opsx-propose` → `.claude/commands/opsx-propose.md`) |
+
+Package-managed workflow skills are bundled in `mypi/extensions/openspec/skills/` and loaded automatically. See [OpenSpec Core Profile](#openspec-core-profile) for the built-in workflow skills.
+
+---
+
+## Template Generation
+
+The template system generates slash command files from workflow skills. This lets mypi's workflow skills work as native slash commands in Claude Code, Cursor, and Windsurf.
+
+### Command files for Claude Code, Cursor, and Windsurf
+
+Generate command files for all three tools:
+
+```bash
+mypi template generate --tool claude
+mypi template generate --tool cursor
+mypi template generate --tool windsurf
+```
+
+Each tool has its own conventions:
+
+| Tool | Output directory | Format |
+|---|---|---|
+| Claude Code | `.claude/commands/` | Markdown with `# Command Name` heading |
+| Cursor | `.cursor/rules/` | YAML frontmatter + Markdown body |
+| Windsurf | `.windsurfrules/` | Plain text with description |
+
+Generated files contain the full skill body from the workflow skill. Running `/opsx:propose` in Claude Code will invoke the same instructions as typing it in mypi.
+
+List available templates:
+
+```bash
+mypi template list
+```
+
+Validate that all workflow skills have complete content:
+
+```bash
+mypi template validate
+```
+
+---
+
+## OpenSpec Core Profile
+
+mypi ships with four built-in workflow skills that implement the [OpenSpec](https://github.com/Fission-AI/OpenSpec) core profile. These skills guide the LLM through a structured change workflow: propose → explore → apply → archive.
+
+### The four commands
+
+| Command | Purpose |
+|---|---|
+| `/opsx:propose` | Create a new change with planning artifacts (proposal, specs, design, tasks) |
+| `/opsx:explore` | Think through ideas, investigate problems, clarify requirements — no code written |
+| `/opsx:apply` | Implement tasks from the checklist, marking each complete as you go |
+| `/opsx:archive` | Finalize a completed change by moving it to the archive |
+
+These commands are available in mypi's interactive, print, and RPC modes. They also work as slash commands in Claude Code, Cursor, and Windsurf after running `mypi template generate --tool <tool>`.
+
+### How it works
+
+The OpenSpec skills use a **change directory** structure:
+
+```
+openspec/
+└── changes/
+    └── <change-name>/           # e.g., add-dark-mode
+        ├── .openspec.yaml       # Metadata (schema, created date)
+        ├── proposal.md           # Why & what
+        ├── specs/
+        │   └── <capability>/    # Per-capability requirements
+        │       └── spec.md
+        ├── design.md             # How (technical decisions)
+        └── tasks.md             # Implementation checklist
+```
+
+State is determined by **filesystem existence** — the LLM reads the directory to know which artifacts exist and which are still needed.
+
+### Example session
+
+**Step 1 — Propose a change:**
+
+```
+> /opsx:propose add-dark-mode
+
+You: Add a dark mode toggle to the settings page
+
+[LLM creates openspec/changes/add-dark-mode/ with all artifacts]
+
+## Change Created: add-dark-mode
+
+Location: openspec/changes/add-dark-mode/
+Artifacts:
+- proposal.md ✓
+- specs/ui-theme/spec.md ✓
+- design.md ✓
+- tasks.md ✓ (8 tasks)
+
+Ready for implementation. Run /opsx:apply to start working.
+```
+
+**Step 2 — Explore (optional):**
+
+```
+> /opsx:explore
+
+You: I want to improve the auth flow
+
+[LLM investigates the codebase, asks questions, draws diagrams]
+[Offers to capture decisions in artifacts when ready]
+```
+
+**Step 3 — Implement:**
+
+```
+> /opsx:apply add-dark-mode
+
+Implementing change: add-dark-mode
+
+Working on task: 1.1 Create ThemeContext
+[...implementation...]
+✓ Task complete
+
+Working on task: 1.2 Add CSS custom properties
+✓ Task complete
+
+## Implementation Progress: add-dark-mode
+Tasks completed: 2/8
+```
+
+**Step 4 — Archive:**
+
+```
+> /opsx:archive add-dark-mode
+
+[LLM checks artifacts and tasks]
+
+Warning: 1 task not complete:
+- [ ] 3.2 Add accessibility tests
+
+Archive anyway? (yes/no)
+
+You: yes
+
+## Archive Complete ✓
+
+Change: add-dark-mode
+Archived to: openspec/changes/archive/2026-03-20-add-dark-mode/
 ```
 
 ---

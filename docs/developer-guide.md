@@ -140,10 +140,12 @@ Internal-only (not dispatched to extensions):
 
 **`agent_session.py`** — The runtime loop.
 
-- `AgentSession(provider, session_manager, model, tool_registry, extensions, system_prompt, compaction_threshold, max_retries, context_window)` — Main class.
-- `AgentSession.prompt(text)` — Run one full turn. Raises `RuntimeError` if called while another turn is in progress.
+- `AgentSession(provider, session_manager, model, tool_registry, extensions, system_prompt, compaction_threshold, max_retries, context_window, skill_loader)` — Main class. `skill_loader` enables `/opsx:` command routing.
+- `AgentSession.prompt(text)` — Run one full turn. Detects `/opsx:` prefix and routes to workflow skills. Raises `RuntimeError` if called while another turn is in progress.
 - `AgentSession.steer(text)` — Inject a mid-turn correction. Replaces an in-flight tool result if one is pending; otherwise delegates to `follow_up`.
 - `AgentSession.follow_up(text)` — Queue a follow-up message (runs as a new prompt after the current turn).
+- `AgentSession._is_opsx_command(text)` — Returns `True` if text starts with `/opsx:`.
+- `AgentSession._handle_opsx_command(text)` — Loads the matching workflow skill and injects its body as the user message.
 - Callbacks: `on_token`, `on_tool_call`, `on_tool_result`, `on_error` — Set these on the instance before calling `prompt()`.
 
 ### mypi/tools/
@@ -179,11 +181,46 @@ Internal-only (not dispatched to extensions):
 
 **`skill_loader.py`** — Skill file loading and injection.
 
-- `Skill(skills_dirs)` — Dataclass representing a skill with `name`, `description`, `file_path`, `compatibility`, and optional `body`.
-- `SkillLoader(skills_dirs)` — Scans multiple directories for `.md` skill files with YAML frontmatter.
+- `Skill(skills_dirs)` — Dataclass representing a skill with `name`, `description`, `file_path`, `compatibility`, optional `body`, and `metadata` (raw YAML frontmatter dict).
+- `SkillLoader(skills_dirs)` — Scans multiple directories for `.md` skill files with YAML frontmatter. Package-managed skills are prepended so they take priority.
+- `SkillLoader.set_package_skills_dir(path)` — Class method to set the package-managed skills directory. Call at startup before instantiating.
 - `SkillLoader.load_skills_metadata()` — Returns a list of `Skill` objects with metadata only (name, description). Used for system prompt injection.
 - `SkillLoader.load_skill_content(name)` — Returns a `Skill` with full body content for a specific skill. Used for on-demand loading.
-- `SkillLoader.inject_skills(event: BeforeAgentStartEvent)` — Appends skill metadata to the system prompt in a "# Available Skills" section. Full content is loaded via the `skill` tool instead.
+- `SkillLoader.inject_skills(event: BeforeAgentStartEvent)` — Appends skill metadata to the system prompt in a "# Available Skills" section.
+
+**`openspec/`** — Built-in OpenSpec core profile workflow skills.
+
+- `skills/opsx-propose.md` — Propose skill: create a change with all planning artifacts.
+- `skills/opsx-explore.md` — Explore skill: thinking partner, no code written.
+- `skills/opsx-apply.md` — Apply skill: implement tasks from the checklist.
+- `skills/opsx-archive.md` — Archive skill: finalize and move a change to archive.
+
+### mypi/templates/
+
+**`adapters.py`** — Tool-specific command file formatters.
+
+- `ToolAdapter` — ABC with `tool_id`, `get_file_path(command_id)`, `format_file(CommandContent)`.
+- `ClaudeAdapter` / `CursorAdapter` / `WindsurfAdapter` — Concrete formatters for each AI tool's command file conventions.
+- `CommandContent(id, name, description, category, tags, body)` — Dataclass holding the content to format.
+- `ADAPTERS` — Dict mapping tool IDs to adapter instances.
+
+**`registry.py`** — Template registry for workflow skill → command file generation.
+
+- `WorkflowTemplate(skill, command_id, command_tags, command_category)` — Dataclass pairing a `Skill` with its generated command metadata.
+- `TemplateRegistry(skills_dirs)` — Loads skills, filters those with `workflow:` frontmatter, generates command files.
+- `TemplateRegistry.load_workflows()` — Scans skills dirs for `workflow:` metadata, returns `dict[str, WorkflowTemplate]`.
+- `TemplateRegistry.generate_commands(tool_id, output_dir)` — Generates command files for the specified tool. Returns list of generated `Path`s.
+- `TemplateRegistry.validate_parity()` — Checks all workflow skills have non-empty bodies and required metadata.
+
+**`cli.py`** — CLI subcommand for `mypi template`.
+
+- `add_template_parser(subparsers)` — Adds `template` subparser to an argparse parser.
+- `run_template_cmd(args)` — Dispatches to `list`, `generate`, or `validate` subcommands.
+
+**`artifacts/`** — OpenSpec artifact templates.
+
+- `TEMPLATES` — Dict mapping artifact IDs (`"proposal"`, `"spec"`, `"design"`, `"tasks"`) to template content strings.
+- Templates are loaded at import time from the bundled `.md` files.
 
 ### mypi/tui/
 
@@ -209,6 +246,163 @@ Internal-only (not dispatched to extensions):
 **`rpc.py`** — `RPCMode` — JSONL subprocess protocol. See [RPC Protocol](#rpc-protocol).
 
 **`sdk.py`** — `SDK` — Embeddable Python API. See [SDK Usage](#sdk-usage).
+
+---
+
+## Architecture Walkthrough: OpenSpec Core Profile as a Worked Example
+
+This section walks through how the OpenSpec core profile (`/opsx:propose`, `/opsx:explore`, `/opsx:apply`, `/opsx:archive`) is implemented in mypi using the skill-driven architecture. It demonstrates how all the core systems — `SkillLoader`, `TemplateRegistry`, `ToolAdapter`, and `AgentSession` — work together.
+
+### Design: Skill-Driven Architecture
+
+The OpenSpec core profile uses a **pure skill-driven** approach:
+
+1. **Skills are the implementation.** Each command is a skill file in `mypi/extensions/openspec/skills/`. The skill body contains all the instructions the LLM follows.
+2. **No Python execution.** The LLM creates files and directories directly using the `write`, `bash`, and `edit` tools — no `ChangeManager` or CLI needed.
+3. **Filesystem as state.** The LLM reads the directory structure to determine what artifacts exist and what needs to be created.
+
+### Component 1: Skill Files (`mypi/extensions/openspec/skills/`)
+
+Each skill is a markdown file with YAML frontmatter:
+
+```markdown
+---
+name: opsx-propose
+description: Propose a new change - create it and generate all artifacts in one step
+category: Workflow
+tags: [openspec, change, workflow]
+workflow: opsx-propose
+command_id: opsx-propose
+---
+
+Propose a new change - create the change and generate all artifacts in one step.
+...
+```
+
+The `workflow:` key marks it as a workflow skill. The `command_id:` key controls the output filename for template generation.
+
+### Component 2: Package Skill Discovery (`skill_loader.py`)
+
+The OpenSpec skills live in the package, not in `~/.mypi/skills/`. At startup:
+
+```python
+# __main__.py
+package_skills = Path(__file__).parent / "extensions" / "openspec" / "skills"
+SkillLoader.set_package_skills_dir(package_skills)
+skill_loader = SkillLoader([config.paths.skills_dir])
+```
+
+`set_package_skills_dir()` prepends the package path so package skills take priority over user skills with the same name. When the LLM sees `/opsx:propose`, the routing logic in `AgentSession` looks up `opsx-propose` via `skill_loader.load_skill_content()`.
+
+### Component 3: Template Generation (`mypi/templates/`)
+
+The template system reads workflow skills and generates slash command files:
+
+```bash
+mypi template generate --tool claude
+```
+
+This flow:
+
+1. `TemplateRegistry.load_workflows()` — `SkillLoader` scans skills dirs. Skills with `workflow:` metadata are collected into `WorkflowTemplate` objects.
+2. For each `WorkflowTemplate` — the `ClaudeAdapter` formats the skill body into Claude Code's convention (markdown with heading). `get_file_path(command_id)` returns `.claude/commands/opsx-propose.md`.
+3. Files are written to the output directory.
+
+The `command_id` frontmatter field controls the output filename. Without it, the skill `name` would be used. This lets skills have a descriptive internal name (`opsx-propose`) while controlling the public-facing command name.
+
+### Component 4: Slash Command Routing (`agent_session.py`)
+
+When the user types `/opsx:propose add-dark-mode`, `AgentSession.prompt()` intercepts it:
+
+```python
+def _is_opsx_command(self, text: str) -> bool:
+    return text.strip().startswith("/opsx:") and len(text.strip()) > 6
+
+def _handle_opsx_command(self, text: str) -> str:
+    prefix = "/opsx:"
+    rest = text.strip()[len(prefix):]          # "propose add-dark-mode"
+    command, args = rest.split(" ", 1) if " " in rest else (rest, "")
+    skill_name = f"opsx-{command}"              # "opsx-propose"
+    skill = self._skill_loader.load_skill_content(skill_name)
+    return (
+        f"--- Skill: {skill.name} ---\n\n"
+        f"{skill.body}\n\n"
+        f"--- User Request ---\n\n{args}"
+    )
+```
+
+The result is injected as the user's message. The LLM sees the skill instructions followed by the user's request, and follows the skill's step-by-step guidance to create the change.
+
+### Component 5: Artifact Templates (`mypi/templates/artifacts/`)
+
+The OpenSpec skills reference artifact templates for structure. The `proposal.md` template, for example:
+
+```markdown
+## Why
+
+<!-- Explain the motivation for this change. What problem does this solve? Why now? -->
+
+## What Changes
+
+<!-- Describe what will change. Be specific about new capabilities... -->
+
+## Capabilities
+
+### New Capabilities
+<!-- Each creates specs/<name>/spec.md. Use kebab-case names. -->
+- `<name>`: <brief description>
+
+### Modified Capabilities
+<!-- Existing capabilities whose REQUIREMENTS are changing... -->
+- `<existing-name>`: <what requirement is changing>
+
+## Impact
+<!-- Affected code, APIs, dependencies, systems -->
+```
+
+Skills reference these as structure guides. The LLM uses the template headers as section names to fill in, creating consistent artifacts across changes.
+
+### Data Flow Summary
+
+```
+User types "/opsx:propose add-dark-mode"
+            │
+            ▼
+AgentSession._is_opsx_command() ────► False ──► Normal turn processing
+            │ True
+            ▼
+AgentSession._handle_opsx_command()
+  → skill_loader.load_skill_content("opsx-propose")
+  → Returns skill body + user args
+            │
+            ▼
+LLM sees skill instructions + "add-dark-mode"
+  → Follows step-by-step guidance
+  → Uses write/bash/edit tools
+  → Creates openspec/changes/add-dark-mode/
+      ├── .openspec.yaml
+      ├── proposal.md
+      ├── specs/ui-theme/spec.md
+      ├── design.md
+      └── tasks.md
+            │
+            ▼
+mypi template generate --tool claude
+  → TemplateRegistry.load_workflows()
+  → Finds opsx-propose.md (workflow: opsx-propose)
+  → ClaudeAdapter writes .claude/commands/opsx-propose.md
+  → Now works as a native Claude Code slash command
+```
+
+### Key Design Decisions in This Implementation
+
+| Decision | Rationale |
+|---|---|
+| Skills as the only implementation | Simplest possible architecture — no duplicate CLI logic, fully testable via skill content |
+| Filesystem as state | LLM reads directory structure directly — no schema loader needed, no API calls |
+| Package-managed skills | Skills ship with mypi and are always available; user skills in `~/.mypi/skills/` override if needed |
+| `command_id` decoupled from skill `name` | Skill internal name can be descriptive (`opsx-propose`) while output filename is clean |
+| Skill routing in `prompt()` | Clean interception before the message enters the turn — no changes to `_run_turn()` |
 
 ---
 
@@ -414,6 +608,31 @@ compatibility: <optional metadata>
 <Skill body — plain Markdown. Can contain headers, lists, code blocks.>
 ```
 
+**Workflow skills** — skills with `workflow:` frontmatter — are treated differently. They drive the template system for generating slash command files:
+
+```markdown
+---
+name: my-workflow
+description: Do a thing
+category: Workflow
+tags: [workflow, example]
+workflow: my-workflow          # Marks this as a workflow skill
+command_id: my-workflow       # Output filename for command file generation
+---
+
+## Step 1: Do the thing
+...
+```
+
+| Field | Required | Description |
+|---|---|---|
+| `name` | yes | Skill identifier (shown in system prompt) |
+| `description` | yes | When-to-use guidance |
+| `workflow` | no | If present, marks skill as a workflow skill for template generation |
+| `command_id` | no | Filename for generated command file (defaults to `name` if omitted) |
+| `category` | no | Category tag for command file metadata |
+| `tags` | no | List of tags for command file metadata |
+
 **Full example:**
 
 ```markdown
@@ -459,6 +678,7 @@ This keeps the system prompt lean while still making skill instructions availabl
 - Frontmatter is parsed with `yaml.safe_load`.
 - Files missing `name` in frontmatter are silently skipped.
 - Files that fail YAML parsing are silently skipped.
+- `metadata` field exposes the raw YAML dict for programmatic access.
 
 ---
 
@@ -603,6 +823,7 @@ sdk = SDK(
     model=config.provider.model,
     tool_registry=make_builtin_registry(),
     system_prompt="You are a code review assistant.",  # optional
+    skill_loader=skill_loader,  # enables /opsx: command routing
 )
 ```
 
@@ -661,6 +882,7 @@ sdk = SDK(
     session_manager=sm,
     model=config.provider.model,
     extensions=[LoggingExtension()],
+    skill_loader=skill_loader,  # enables /opsx: command routing
 )
 ```
 
@@ -875,6 +1097,9 @@ tests/
 │   ├── test_base.py          # Extension ABC tests
 │   ├── test_loader.py        # ExtensionLoader tests
 │   └── test_skill_loader.py  # SkillLoader and frontmatter parsing tests
+├── templates/
+│   ├── test_artifacts.py     # OpenSpec artifact template content validation
+│   └── test_registry.py       # TemplateRegistry and adapter format tests
 ├── modes/
 │   ├── test_print_mode.py
 │   ├── test_rpc.py
