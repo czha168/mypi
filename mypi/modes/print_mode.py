@@ -5,6 +5,7 @@ from mypi.core.agent_session import AgentSession
 from mypi.core.session_manager import SessionManager
 from mypi.ai.provider import LLMProvider
 from mypi.tools.base import ToolRegistry
+from mypi.extensions.skill_loader import SkillLoader
 
 
 class PrintMode:
@@ -17,6 +18,7 @@ class PrintMode:
         extensions: list | None = None,
         system_prompt: str | None = None,
         output: IO[str] = sys.stdout,
+        skill_loader: SkillLoader | None = None,
     ):
         self.output = output
         kwargs: dict = dict(
@@ -25,6 +27,7 @@ class PrintMode:
             model=model,
             tool_registry=tool_registry,
             extensions=extensions or [],
+            skill_loader=skill_loader,
         )
         if system_prompt:
             kwargs["system_prompt"] = system_prompt

@@ -16,7 +16,7 @@ class SkillTool(Tool):
     def __init__(self, skill_loader_getter):
         self._get_loader = skill_loader_getter
 
-    async def execute(self, name: str) -> ToolResult:
+    async def execute(self, name: str) -> ToolResult:  # type: ignore[reportIncompatibleMethodOverride]
         loader = self._get_loader()
         if loader is None:
             return ToolResult(error="No skill loader configured")

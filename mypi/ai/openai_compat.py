@@ -1,6 +1,6 @@
 from __future__ import annotations
 import json
-from typing import AsyncIterator
+from typing import AsyncGenerator
 import openai
 from mypi.ai.provider import LLMProvider, ProviderEvent, TokenEvent, LLMToolCallEvent, DoneEvent, TokenUsage
 
@@ -10,14 +10,14 @@ class OpenAICompatProvider(LLMProvider):
         self.default_model = default_model
         self._client = openai.AsyncOpenAI(base_url=base_url, api_key=api_key)
 
-    async def stream(
+    async def stream(  # type: ignore[reportIncompatibleMethodOverride]
         self,
         messages: list[dict],
         tools: list[dict],
         model: str,
         system: str,
         **kwargs,
-    ) -> AsyncIterator[ProviderEvent]:
+    ) -> AsyncGenerator[ProviderEvent, None]:
         full_messages = ([{"role": "system", "content": system}] if system else []) + messages
         create_kwargs = dict(model=model, messages=full_messages, stream=True, **kwargs)
         if tools:
@@ -26,7 +26,7 @@ class OpenAICompatProvider(LLMProvider):
         # Accumulate streaming tool call arguments (may arrive in multiple chunks)
         pending_tool_calls: dict[int, dict] = {}
 
-        result = self._client.chat.completions.create(**create_kwargs)
+        result = self._client.chat.completions.create(**create_kwargs)  # type: ignore[reportCallIssue]
         response = await result if hasattr(result, '__await__') else result
         async for chunk in response:
             choice = chunk.choices[0] if chunk.choices else None

@@ -5,11 +5,10 @@ from mypi.core.agent_session import AgentSession
 from mypi.core.session_manager import SessionManager
 from mypi.ai.provider import LLMProvider
 from mypi.tools.base import ToolRegistry
+from mypi.extensions.skill_loader import SkillLoader
 
 
 class SDK:
-    """Embeddable Python API for mypi. Use prompt() for full response or stream() for streaming."""
-
     def __init__(
         self,
         provider: LLMProvider,
@@ -18,6 +17,7 @@ class SDK:
         tool_registry: ToolRegistry | None = None,
         extensions: list | None = None,
         system_prompt: str | None = None,
+        skill_loader: SkillLoader | None = None,
     ):
         kwargs: dict = dict(
             provider=provider,
@@ -25,6 +25,7 @@ class SDK:
             model=model,
             tool_registry=tool_registry,
             extensions=extensions or [],
+            skill_loader=skill_loader,
         )
         if system_prompt:
             kwargs["system_prompt"] = system_prompt

@@ -31,7 +31,7 @@ def test_branch_creates_new_leaf(tmp_sessions_dir):
     entry_a = sm.current_leaf_id
     sm.append(SessionEntry(type="message", data={"role": "assistant", "content": "b"}))
 
-    sm.branch(entry_a)
+    sm.branch(entry_a)  # type: ignore[reportArgumentType]
     sm.append(SessionEntry(type="message", data={"role": "user", "content": "branch msg"}))
 
     leaf_ids = sm.get_leaf_ids()
@@ -82,7 +82,7 @@ def test_compaction_is_path_local(tmp_sessions_dir):
     sm.append(SessionEntry(type="message", data={"role": "user", "content": "main continued"}))
 
     # Switch to side branch from before compaction
-    sm.branch(branch_point)
+    sm.branch(branch_point)  # type: ignore[reportArgumentType]
     sm.append(SessionEntry(type="message", data={"role": "user", "content": "side branch"}))
     side_leaf = sm.current_leaf_id
 

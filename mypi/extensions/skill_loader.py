@@ -1,5 +1,5 @@
 from __future__ import annotations
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 import yaml
 from mypi.core.events import BeforeAgentStartEvent
@@ -13,6 +13,7 @@ class Skill:
     file_path: Path
     compatibility: str | None = None
     body: str | None = None
+    metadata: dict = field(default_factory=dict)  # Raw YAML frontmatter
 
 
 def _parse_skill(path: Path, include_body: bool = False) -> Skill | None:
@@ -36,14 +37,26 @@ def _parse_skill(path: Path, include_body: bool = False) -> Skill | None:
             file_path=path,
             compatibility=frontmatter.get("compatibility"),
             body=body,
+            metadata=frontmatter,
         )
     except Exception:
         return None
 
 
 class SkillLoader:
+    # Package-managed skills are prepended so they take priority over user skills
+    # when both define a skill with the same name.
+    _package_skills_dir: Path | None = None
+
+    @classmethod
+    def set_package_skills_dir(cls, path: Path | None) -> None:
+        """Set the package-managed skills directory. Call once at startup."""
+        cls._package_skills_dir = path
+
     def __init__(self, skills_dirs: list[Path]):
-        self.skills_dirs = [Path(d) for d in skills_dirs]
+        # Prepend package-managed skills so they take priority
+        package = [self._package_skills_dir] if self._package_skills_dir else []
+        self.skills_dirs = [p for p in package if p] + [Path(d) for d in skills_dirs]
 
     def load_skills_metadata(self) -> list[Skill]:
         """Load skill metadata only (name, description). Used for system prompt."""

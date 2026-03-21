@@ -150,6 +150,7 @@ class SessionManager:
     def _write_entry(self, entry: SessionEntry) -> None:
         self._entries.append(entry)
         self._active_leaf_id = entry.id
+        assert self._session_file is not None
         with self._session_file.open("a") as f:
             f.write(entry.to_jsonl() + "\n")
 
@@ -184,6 +185,7 @@ class SessionManager:
         self._rewrite_file()
 
     def _rewrite_file(self) -> None:
+        assert self._session_file is not None
         with self._session_file.open("w") as f:
             for entry in self._entries:
                 f.write(entry.to_jsonl() + "\n")

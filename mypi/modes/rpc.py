@@ -3,10 +3,13 @@ import asyncio
 import json
 import logging
 import sys
+from typing import cast
+from io import BufferedReader
 from mypi.core.agent_session import AgentSession
 from mypi.core.session_manager import SessionManager
 from mypi.ai.provider import LLMProvider
 from mypi.tools.base import ToolRegistry
+from mypi.extensions.skill_loader import SkillLoader
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +22,7 @@ class RPCMode:
         model: str,
         tool_registry: ToolRegistry | None = None,
         extensions: list | None = None,
+        skill_loader: SkillLoader | None = None,
     ):
         self._session = AgentSession(
             provider=provider,
@@ -26,6 +30,7 @@ class RPCMode:
             model=model,
             tool_registry=tool_registry,
             extensions=extensions or [],
+            skill_loader=skill_loader,
         )
 
         self._session.on_token = lambda t: self._emit({"type": "token", "text": t})
@@ -42,7 +47,9 @@ class RPCMode:
         if reader is None:
             reader = asyncio.StreamReader()
             loop = asyncio.get_running_loop()
-            loop.add_reader(sys.stdin.fileno(), lambda: reader.feed_data(sys.stdin.buffer.read1()))
+            loop.add_reader(sys.stdin.fileno(), lambda: reader.feed_data(
+                cast(BufferedReader, sys.stdin.buffer).read1()  # type: ignore[reportArgumentType]
+            ))
 
         while True:
             try:

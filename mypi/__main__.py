@@ -21,6 +21,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--skills-dir", metavar="DIR", action="append", dest="skills_dirs", help="Additional skills directory")
     p.add_argument("--base-url", metavar="URL", help="Override OpenAI-compatible base URL")
     p.add_argument("--config", metavar="PATH", help="Path to config.toml")
+    sub = p.add_subparsers(dest="cmd", metavar="COMMAND", help="Available commands")
+    from mypi.templates.cli import add_template_parser
+    add_template_parser(sub)
     return p
 
 
@@ -48,11 +51,16 @@ async def _run(args: argparse.Namespace) -> None:
             all_entries = {e.id: e for e in sm.load_all_entries()}
             print(f"\nSession has {len(leaves)} branches. Select one to resume:\n")
             for i, leaf_id in enumerate(leaves):
+                if leaf_id is None:
+                    continue
                 entry = all_entries.get(leaf_id)
                 depth = 0
-                cur = leaf_id
+                cur: str = leaf_id
                 while all_entries.get(cur) and all_entries[cur].parent_id:
-                    cur = all_entries[cur].parent_id
+                    parent_id = all_entries[cur].parent_id
+                    if parent_id is None:
+                        break
+                    cur = parent_id
                     depth += 1
                 preview = ""
                 if entry and entry.type == "message":
@@ -70,7 +78,12 @@ async def _run(args: argparse.Namespace) -> None:
     else:
         sm.new_session(model=config.provider.model)
 
-    # Skills — create loader first so we can pass getter to tools
+    # Skills — set package skills path before loading so package skills take priority
+    from mypi.extensions.skill_loader import SkillLoader as SL
+    package_skills = Path(__file__).parent / "extensions" / "openspec" / "skills"
+    if package_skills.exists():
+        SL.set_package_skills_dir(package_skills)
+
     skills_dirs = [config.paths.skills_dir]
     if args.skills_dirs:
         skills_dirs += [Path(d) for d in args.skills_dirs]
@@ -97,13 +110,15 @@ async def _run(args: argparse.Namespace) -> None:
     if args.print_prompt:
         from mypi.modes.print_mode import PrintMode
         mode = PrintMode(provider=provider, session_manager=sm, model=model,
-                         tool_registry=registry, extensions=all_extensions)
+                         tool_registry=registry, extensions=all_extensions,
+                         skill_loader=skill_loader)
         await mode.run(args.print_prompt)
 
     elif args.rpc:
         from mypi.modes.rpc import RPCMode
         mode = RPCMode(provider=provider, session_manager=sm, model=model,
-                       tool_registry=registry, extensions=all_extensions)
+                       tool_registry=registry, extensions=all_extensions,
+                       skill_loader=skill_loader)
         await mode.run()
 
     else:
@@ -112,6 +127,7 @@ async def _run(args: argparse.Namespace) -> None:
             provider=provider, session_manager=sm, model=model,
             session_id=session_id,
             tool_registry=registry, extensions=all_extensions,
+            skill_loader=skill_loader,
         )
         await mode.run()
 
@@ -120,6 +136,9 @@ def main() -> None:
     parser = build_parser()
     args = parser.parse_args()
     try:
+        if args.cmd == "template":
+            from mypi.templates.cli import run_template_cmd
+            exit(run_template_cmd(args))
         asyncio.run(_run(args))
     except KeyboardInterrupt:
         pass

@@ -4,7 +4,7 @@ import re
 import shutil
 from datetime import datetime
 from pathlib import Path
-from mypi.tools.base import Tool, ToolResult
+from mypi.tools.base import Tool, ToolResult, ToolRegistry
 
 
 class ReadTool(Tool):
@@ -20,7 +20,7 @@ class ReadTool(Tool):
         "required": ["path"],
     }
 
-    async def execute(self, path: str, offset: int = 1, limit: int | None = None) -> ToolResult:
+    async def execute(self, path: str, offset: int = 1, limit: int | None = None) -> ToolResult:  # type: ignore[reportIncompatibleMethodOverride]
         try:
             lines = Path(path).read_text().splitlines()
             start = max(0, offset - 1)
@@ -45,7 +45,7 @@ class WriteTool(Tool):
         "required": ["path", "content"],
     }
 
-    async def execute(self, path: str, content: str) -> ToolResult:
+    async def execute(self, path: str, content: str) -> ToolResult:  # type: ignore[reportIncompatibleMethodOverride]
         try:
             p = Path(path)
             p.parent.mkdir(parents=True, exist_ok=True)
@@ -68,7 +68,7 @@ class EditTool(Tool):
         "required": ["path", "old_string", "new_string"],
     }
 
-    async def execute(self, path: str, old_string: str, new_string: str) -> ToolResult:
+    async def execute(self, path: str, old_string: str, new_string: str) -> ToolResult:  # type: ignore[reportIncompatibleMethodOverride]
         try:
             content = Path(path).read_text()
             count = content.count(old_string)
@@ -97,7 +97,7 @@ class BashTool(Tool):
         "required": ["command"],
     }
 
-    async def execute(self, command: str, timeout: float = 30) -> ToolResult:
+    async def execute(self, command: str, timeout: float = 30) -> ToolResult:  # type: ignore[reportIncompatibleMethodOverride]
         try:
             proc = await asyncio.create_subprocess_shell(
                 command,
@@ -130,7 +130,7 @@ class FindTool(Tool):
         "required": ["path", "pattern"],
     }
 
-    async def execute(self, path: str, pattern: str) -> ToolResult:
+    async def execute(self, path: str, pattern: str) -> ToolResult:  # type: ignore[reportIncompatibleMethodOverride]
         try:
             matches = sorted(
                 Path(path).rglob(pattern),
@@ -155,7 +155,7 @@ class GrepTool(Tool):
         "required": ["pattern", "path"],
     }
 
-    async def execute(self, pattern: str, path: str, glob: str | None = None) -> ToolResult:
+    async def execute(self, pattern: str, path: str, glob: str | None = None) -> ToolResult:  # type: ignore[reportIncompatibleMethodOverride]
         if shutil.which("rg"):
             return await self._rg(pattern, path, glob)
         return await self._python_grep(pattern, path, glob)
@@ -206,7 +206,7 @@ class LsTool(Tool):
         "required": ["path"],
     }
 
-    async def execute(self, path: str) -> ToolResult:
+    async def execute(self, path: str) -> ToolResult:  # type: ignore[reportIncompatibleMethodOverride]
         try:
             entries = []
             for p in sorted(Path(path).iterdir()):
@@ -220,9 +220,7 @@ class LsTool(Tool):
             return ToolResult(error=str(e))
 
 
-def make_builtin_registry(skill_loader_getter=None) -> "ToolRegistry":
-    """Create a ToolRegistry pre-populated with all built-in tools."""
-    from mypi.tools.base import ToolRegistry
+def make_builtin_registry(skill_loader_getter=None) -> ToolRegistry:
     reg = ToolRegistry()
     for tool in [ReadTool(), WriteTool(), EditTool(), BashTool(), FindTool(), GrepTool(), LsTool()]:
         reg.register(tool)

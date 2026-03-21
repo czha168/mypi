@@ -5,6 +5,7 @@ from mypi.ai.provider import LLMProvider
 from mypi.tools.base import ToolRegistry
 from mypi.tui.app import TUIApp
 from mypi.extensions.base import Extension
+from mypi.extensions.skill_loader import SkillLoader
 
 
 class InteractiveMode:
@@ -17,12 +18,13 @@ class InteractiveMode:
         tool_registry: ToolRegistry | None = None,
         extensions: list[Extension] | None = None,
         system_prompt: str | None = None,
+        skill_loader: SkillLoader | None = None,
     ):
         self._session_manager = session_manager
         self._app = TUIApp(
             model=model,
             session_id=session_id,
-            on_cancel=lambda: None,  # handled by KeyboardInterrupt
+            on_cancel=lambda: None,
             on_clear=lambda: None,
             on_checkpoint=lambda: None,
         )
@@ -35,6 +37,7 @@ class InteractiveMode:
             model=model,
             tool_registry=tool_registry,
             extensions=extensions or [],
+            skill_loader=skill_loader,
         )
         if system_prompt:
             kwargs["system_prompt"] = system_prompt

@@ -10,6 +10,7 @@ from mypi.core.events import (
 )
 from mypi.core.session_manager import SessionManager, SessionEntry
 from mypi.extensions.base import Extension
+from mypi.extensions.skill_loader import SkillLoader
 from mypi.tools.base import ToolRegistry, ToolResult
 
 logger = logging.getLogger(__name__)
@@ -29,6 +30,7 @@ class AgentSession:
         compaction_threshold: float = 0.80,
         max_retries: int = 3,
         context_window: int = 128_000,
+        skill_loader: SkillLoader | None = None,
     ):
         self.provider = provider
         self.session_manager = session_manager
@@ -39,6 +41,7 @@ class AgentSession:
         self.compaction_threshold = compaction_threshold
         self.max_retries = max_retries
         self._context_window = context_window
+        self._skill_loader = skill_loader
         self._last_input_tokens: int = 0
         self._is_idle = True
         self._in_flight_tool: str | None = None
@@ -54,11 +57,35 @@ class AgentSession:
     def is_idle(self) -> bool:
         return self._is_idle
 
+    def _is_opsx_command(self, text: str) -> bool:
+        stripped = text.strip()
+        return stripped.startswith("/opsx:") and len(stripped) > 6
+
+    def _handle_opsx_command(self, text: str) -> str:
+        prefix = "/opsx:"
+        rest = text.strip()[len(prefix):]
+        if " " in rest:
+            command, args = rest.split(" ", 1)
+        else:
+            command, args = rest, ""
+        skill_name = f"opsx-{command}"
+        if self._skill_loader:
+            skill = self._skill_loader.load_skill_content(skill_name)
+            if skill and skill.body:
+                return (
+                    f"--- Skill: {skill.name} ---\n\n"
+                    f"{skill.body}\n\n"
+                    f"--- User Request ---\n\n{args}"
+                )
+        return text
+
     async def prompt(self, text: str) -> None:
         if not self._is_idle:
             raise RuntimeError("Cannot prompt while a turn is already in progress")
         self._is_idle = False
         try:
+            if self._is_opsx_command(text):
+                text = self._handle_opsx_command(text)
             self.session_manager.append(SessionEntry(type="message", data={"role": "user", "content": text}))
             await self._run_turn()
         finally:
@@ -116,7 +143,7 @@ class AgentSession:
             tool_calls_this_round: list[dict] = []
             tool_results: list[dict] = []
 
-            async for event in self.provider.stream(
+            async for event in await self.provider.stream(
                 messages=messages,
                 tools=self.tool_registry.to_openai_schema(),
                 model=self.model,
@@ -236,7 +263,7 @@ class AgentSession:
              "preserving all key decisions, file names, and code changes discussed."}
         ]
         summary_parts: list[str] = []
-        async for event in self.provider.stream(
+        async for event in await self.provider.stream(
             messages=summary_prompt, tools=[], model=self.model, system=""
         ):
             if isinstance(event, TokenEvent):

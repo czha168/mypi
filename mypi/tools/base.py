@@ -22,8 +22,8 @@ class Tool(ABC):
     description: str
     input_schema: dict
 
-    @abstractmethod
-    async def execute(self, **kwargs) -> ToolResult: ...
+    async def execute(self, *args, **kwargs) -> ToolResult:
+        raise NotImplementedError
 
     def to_openai_schema(self) -> dict:
         return {
