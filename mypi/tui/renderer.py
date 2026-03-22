@@ -20,7 +20,7 @@ class StreamingRenderer:
 
     def end_turn(self) -> None:
         """Called at the end of an assistant turn."""
-        pass  # streaming already printed tokens inline
+        self.console.print()
 
     def render_tool_call(self, name: str, args: dict) -> None:
         self.console.print(f"\n[bold cyan]● {name}[/bold cyan] {args}")

@@ -101,23 +101,20 @@ For each capability in **Modified Capabilities**, create a **## MODIFIED Require
 
 ## Step 6: Create `design.md`
 
-Create `openspec/changes/<name>/design.md` if the change involves:
-- Cross-cutting or architectural decisions
-- New external dependencies
-- Security, performance, or migration complexity
+**ALWAYS create** `openspec/changes/<name>/design.md` using the **Write tool**.
 
 Use the design template:
 - **Context** — background, constraints, stakeholders
 - **Goals / Non-Goals** — explicit scope boundaries
 - **Decisions** — key technical choices with rationale
 - **Risks / Trade-offs** — known risks and mitigations
-- **Migration Plan** — deployment and rollback steps
+- **Migration Plan** — deployment and rollback steps (if applicable)
 
 ---
 
 ## Step 7: Create `tasks.md`
 
-Create `openspec/changes/<name>/tasks.md` by breaking down the implementation:
+**ALWAYS create** `openspec/changes/<name>/tasks.md` using the **Write tool**.
 
 - Group related tasks under numbered headings (## 1. Setup, ## 2. Core Implementation, etc.)
 - Each task is a checkbox: `- [ ] 1.1 Task description`
