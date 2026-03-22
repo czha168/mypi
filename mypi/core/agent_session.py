@@ -143,7 +143,7 @@ class AgentSession:
             tool_calls_this_round: list[dict] = []
             tool_results: list[dict] = []
 
-            async for event in await self.provider.stream(
+            async for event in self.provider.stream(
                 messages=messages,
                 tools=self.tool_registry.to_openai_schema(),
                 model=self.model,
@@ -263,7 +263,7 @@ class AgentSession:
              "preserving all key decisions, file names, and code changes discussed."}
         ]
         summary_parts: list[str] = []
-        async for event in await self.provider.stream(
+        async for event in self.provider.stream(
             messages=summary_prompt, tools=[], model=self.model, system=""
         ):
             if isinstance(event, TokenEvent):
