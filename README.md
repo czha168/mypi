@@ -6,11 +6,12 @@ Inspired by [pi-coding-agent](https://github.com/badlogic/pi-mono/tree/main/pack
 
 ## Features
 
-- **7 built-in tools**: read, write, edit, bash, find, grep, ls
+- **12 built-in tools**: read, write, edit, bash, find, grep, ls + 5 LSP-powered tools
 - **4 operation modes**: interactive TUI, print mode, RPC mode, Python SDK
 - **Session persistence**: Tree-structured JSONL with branching and auto-compaction
 - **Extensible**: Python extensions + Claude Code-compatible skills
 - **Any LLM**: Works with any OpenAI-compatible endpoint (Ollama, Groq, LM Studio, etc.)
+- **LSP support**: Python language server integration for semantic code intelligence
 
 ## Installation
 
@@ -30,6 +31,25 @@ export OPENAI_API_KEY=sk-...
 mypi
 ```
 
+### Installing an LSP Server (Recommended)
+
+For LSP tools to work, you need a Python language server installed. mypi will auto-detect any of these servers:
+
+| Server | Installation | Notes |
+|--------|--------------|-------|
+| **pyright** (recommended) | `npm install -g pyright` or `pip install pyright` | Fast, excellent type inference |
+| **pylsp** | `pip install python-lsp-server[all]` | Feature-rich, many plugins |
+| **jedi-language-server** | `pip install jedi-language-server` | Lightweight, good completion |
+
+To specify a server explicitly, set it in your config:
+
+```toml
+[lsp]
+server = "pyright"
+```
+
+If no server is found, LSP tools will return a helpful error message with installation instructions.
+
 ## Configuration
 
 Create `~/.mypi/config.toml`:
@@ -43,6 +63,10 @@ model    = "gpt-4o"
 [session]
 compaction_threshold = 0.80
 max_retries = 3
+
+[lsp]
+server = ""      # "pyright", "pylsp", "jedi-language-server", or empty for auto-detect
+enabled = true   # Set to false to disable LSP tools
 ```
 
 **Environment variables** (override config):
@@ -125,6 +149,67 @@ response = await sdk.prompt("List files in the current directory")
 | `find` | Glob pattern file search |
 | `grep` | Regex content search (uses ripgrep if available) |
 | `ls` | Directory listing with metadata |
+
+## LSP Tools
+
+mypi includes 5 LSP-powered tools for semantic Python code intelligence. These tools communicate with a Python language server (pyright, pylsp, or jedi-language-server) to provide intelligent code navigation and analysis.
+
+| Tool | Description |
+|------|-------------|
+| `lsp_goto_definition` | Jump to the definition of a symbol at a given position |
+| `lsp_find_references` | Find all references to a symbol across the workspace |
+| `lsp_diagnostics` | Get type errors, warnings, and hints for a file |
+| `lsp_hover` | Get type information and documentation for a symbol |
+| `lsp_rename` | Rename a symbol across all references in the workspace |
+
+### LSP Tool Parameters
+
+**`lsp_goto_definition`**
+```json
+{
+  "file_path": "/path/to/file.py",  // Absolute path
+  "line": 10,                        // 1-based line number
+  "character": 5                     // 0-based character offset
+}
+```
+
+**`lsp_find_references`**
+```json
+{
+  "file_path": "/path/to/file.py",
+  "line": 10,
+  "character": 5,
+  "include_declaration": true        // Include symbol's own declaration
+}
+```
+
+**`lsp_diagnostics`**
+```json
+{
+  "file_path": "/path/to/file.py",
+  "severity": "error"                // "error", "warning", "information", "hint", or "all"
+}
+```
+
+**`lsp_hover`**
+```json
+{
+  "file_path": "/path/to/file.py",
+  "line": 10,
+  "character": 5
+}
+```
+
+**`lsp_rename`**
+```json
+{
+  "file_path": "/path/to/file.py",
+  "line": 10,
+  "character": 5,
+  "new_name": "better_name",
+  "dry_run": true                    // Preview changes without applying
+}
+```
 
 ## Extensions
 

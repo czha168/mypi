@@ -220,11 +220,19 @@ class LsTool(Tool):
             return ToolResult(error=str(e))
 
 
-def make_builtin_registry(skill_loader_getter=None) -> ToolRegistry:
+def make_builtin_registry(skill_loader_getter=None, include_lsp: bool = True) -> ToolRegistry:
     reg = ToolRegistry()
     for tool in [ReadTool(), WriteTool(), EditTool(), BashTool(), FindTool(), GrepTool(), LsTool()]:
         reg.register(tool)
     if skill_loader_getter is not None:
         from mypi.tools.skill_tool import SkillTool
         reg.register(SkillTool(skill_loader_getter))
+    if include_lsp:
+        try:
+            from mypi.tools.lsp import make_lsp_tool_registry
+            lsp_reg = make_lsp_tool_registry()
+            for tool in lsp_reg.all_tools():
+                reg.register(tool)
+        except ImportError:
+            pass
     return reg

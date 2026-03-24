@@ -20,6 +20,10 @@ max_retries = 3
 sessions_dir  = "~/.mypi/sessions"
 skills_dir    = "~/.mypi/skills"
 extensions_dir = "~/.mypi/extensions"
+
+[lsp]
+server = ""  # "pyright", "pylsp", "jedi-language-server", or empty for auto-detect
+enabled = true
 """
 
 
@@ -44,10 +48,17 @@ class PathsConfig:
 
 
 @dataclass
+class LSPConfig:
+    server: str = ""  # empty = auto-detect (pyright → pylsp → jedi-language-server)
+    enabled: bool = True
+
+
+@dataclass
 class Config:
     provider: ProviderConfig = field(default_factory=ProviderConfig)
     session: SessionConfig = field(default_factory=SessionConfig)
     paths: PathsConfig = field(default_factory=PathsConfig)
+    lsp: LSPConfig = field(default_factory=LSPConfig)
 
 
 def load_config(config_path: Path | None = None) -> Config:
@@ -60,6 +71,7 @@ def load_config(config_path: Path | None = None) -> Config:
     p = raw.get("provider", {})
     s = raw.get("session", {})
     paths = raw.get("paths", {})
+    l = raw.get("lsp", {})
 
     # Environment variables override config file
     api_key = os.environ.get("OPENAI_API_KEY") or p.get("api_key", "")
@@ -79,5 +91,9 @@ def load_config(config_path: Path | None = None) -> Config:
             sessions_dir=Path(paths.get("sessions_dir", "~/.mypi/sessions")).expanduser(),
             skills_dir=Path(paths.get("skills_dir", "~/.mypi/skills")).expanduser(),
             extensions_dir=Path(paths.get("extensions_dir", "~/.mypi/extensions")).expanduser(),
+        ),
+        lsp=LSPConfig(
+            server=l.get("server", ""),
+            enabled=l.get("enabled", True),
         ),
     )
