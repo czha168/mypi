@@ -5,6 +5,16 @@ from typing import Protocol, runtime_checkable
 from mypi.core.events import ToolCallEvent, ToolResultEvent
 
 
+def filter_tool_arguments(tool: "Tool", arguments: dict) -> dict:
+    """Filter arguments to only include those defined in the tool's input_schema.
+    
+    LLMs may return extra arguments not defined in the schema. This prevents
+    TypeError when passing unexpected keyword arguments to execute().
+    """
+    properties = tool.input_schema.get("properties", {})
+    return {k: v for k, v in arguments.items() if k in properties}
+
+
 @dataclass
 class ToolResult:
     output: str = ""
@@ -56,7 +66,8 @@ class _WrappedTool(Tool):
     async def execute(self, **kwargs) -> ToolResult:
         call_event = ToolCallEvent(tool_name=self.name, arguments=kwargs)
         call_event = await self._runner.fire_tool_call(call_event)
-        result = await self._inner.execute(**call_event.arguments)
+        filtered_args = filter_tool_arguments(self._inner, call_event.arguments)
+        result = await self._inner.execute(**filtered_args)
         result_event = ToolResultEvent(tool_name=self.name, result=result)
         result_event = await self._runner.fire_tool_result(result_event)
         return result_event.result

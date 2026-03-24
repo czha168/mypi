@@ -11,7 +11,7 @@ from mypi.core.events import (
 from mypi.core.session_manager import SessionManager, SessionEntry
 from mypi.extensions.base import Extension
 from mypi.extensions.skill_loader import SkillLoader
-from mypi.tools.base import ToolRegistry, ToolResult
+from mypi.tools.base import ToolRegistry, ToolResult, filter_tool_arguments
 
 logger = logging.getLogger(__name__)
 
@@ -191,7 +191,8 @@ class AgentSession:
 
                     tool = self.tool_registry.get(call_evt.tool_name)
                     if tool:
-                        tool_result = await tool.execute(**call_evt.arguments)
+                        filtered_args = filter_tool_arguments(tool, call_evt.arguments)
+                        tool_result = await tool.execute(**filtered_args)
                     else:
                         tool_result = ToolResult(error=f"Unknown tool: {call_evt.tool_name}")
 
