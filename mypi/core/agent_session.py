@@ -126,8 +126,19 @@ class AgentSession:
                 return
             except Exception as e:
                 if attempt == self.max_retries - 1:
+                    # Max retries exhausted - save recovery checkpoint
+                    retry_after = 60  # default
+                    if hasattr(e, 'retry_after'):
+                        retry_after = e.retry_after
+        
+                    reason = f"Rate limited after {self.max_retries} attempts: {str(e)}"
+                    self.session_manager.save_recovery_checkpoint(reason, retry_after)
+        
                     if self.on_error:
-                        self.on_error(f"Failed after {self.max_retries} attempts: {e}")
+                        self.on_error(
+                            f"Max retries ({self.max_retries}) exhausted. "
+                            f"Session saved. Retry in {retry_after}s: {e}"
+                        )
                     raise
                 delay = 2 ** attempt
                 logger.warning(f"Retrying (attempt {attempt + 1}/{self.max_retries}) after {delay}s: {e}")
