@@ -143,6 +143,25 @@ class SessionManager:
                     messages.append({"role": role, "content": content})
         return messages
 
+    def save_recovery_checkpoint(self, reason: str, retry_after: int) -> None:
+    """Save a recovery checkpoint when hitting max retries."""
+    entry = SessionEntry(
+        type="recovery_checkpoint",
+        data={
+            "reason": reason,
+            "retry_after": retry_after,
+            "timestamp": self._now(),
+        }
+    )
+    self.append(entry)
+
+    def get_last_recovery_checkpoint(self) -> SessionEntry | None:
+        """Get the most recent recovery checkpoint if it exists."""
+        for entry in reversed(self._entries):
+            if entry.type == "recovery_checkpoint":
+                return entry
+        return None
+
     @staticmethod
     def list_sessions(sessions_dir: Path) -> list[str]:
         return [p.stem for p in Path(sessions_dir).glob("*.jsonl")]
