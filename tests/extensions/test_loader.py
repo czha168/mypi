@@ -1,14 +1,14 @@
 import pytest
 from pathlib import Path
-from mypi.extensions.base import Extension
-from mypi.extensions.loader import ExtensionLoader
+from codepi.extensions.base import Extension
+from codepi.extensions.loader import ExtensionLoader
 
 
 @pytest.fixture
 def simple_extension_file(tmp_extensions_dir):
     ext_file = tmp_extensions_dir / "my_ext.py"
     ext_file.write_text("""
-from mypi.extensions.base import Extension
+from codepi.extensions.base import Extension
 
 class MyExtension(Extension):
     name = "my-extension"

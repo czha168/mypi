@@ -1,6 +1,6 @@
 import pytest
-from mypi.tools.base import Tool, ToolResult, ToolRegistry, ExtensionRunner
-from mypi.core.events import ToolCallEvent, ToolResultEvent
+from codepi.tools.base import Tool, ToolResult, ToolRegistry, ExtensionRunner
+from codepi.core.events import ToolCallEvent, ToolResultEvent
 
 
 class EchoTool(Tool):

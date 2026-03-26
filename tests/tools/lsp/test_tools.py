@@ -1,14 +1,27 @@
 from __future__ import annotations
 
+import sys
 import pytest
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from mypi.tools.lsp.goto_definition import LSPGotoDefinitionTool
-from mypi.tools.lsp.find_references import LSPFindReferencesTool
-from mypi.tools.lsp.diagnostics import LSPDiagnosticsTool
-from mypi.tools.lsp.rename import LSPRenameTool
-from mypi.tools.lsp.hover import LSPHoverTool
+from codepi.tools.lsp.goto_definition import LSPGotoDefinitionTool
+from codepi.tools.lsp.find_references import LSPFindReferencesTool
+from codepi.tools.lsp.diagnostics import LSPDiagnosticsTool
+from codepi.tools.lsp.rename import LSPRenameTool
+from codepi.tools.lsp.hover import LSPHoverTool
+
+
+class MockPosition:
+    def __init__(self, line: int, character: int):
+        self.line = line
+        self.character = character
+
+
+@pytest.fixture(autouse=True)
+def mock_lsp_client():
+    with patch.dict(sys.modules, {"lsp_client": MagicMock(Position=MockPosition)}):
+        yield
 
 
 class TestLSPGotoDefinitionTool:

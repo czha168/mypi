@@ -1,1 +1,1 @@
-"""Test suite for mypi."""
+"""Test suite for codepi."""

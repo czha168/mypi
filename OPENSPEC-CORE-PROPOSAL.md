@@ -466,7 +466,7 @@ class ChangeManager:
     
     def _load_artifact_template(self, artifact_id: str) -> str:
         """Load artifact template from bundled templates."""
-        from mypi.templates.artifacts import TEMPLATES
+        from codepi.templates.artifacts import TEMPLATES
         return TEMPLATES.get(artifact_id, "")
 
 
@@ -569,7 +569,7 @@ When ready to implement, run /opsx:apply
    Use the **Bash tool** to run:
    ```bash
    python -c "
-   from mypi.extensions.openspec import ChangeManager
+   from codepi.extensions.openspec import ChangeManager
    from pathlib import Path
    cm = ChangeManager(Path.cwd())
    import json

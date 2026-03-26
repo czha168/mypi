@@ -1,6 +1,6 @@
 """Tests for OpenSpec artifact templates."""
 
-from mypi.templates.artifacts import TEMPLATES, ARTIFACT_DIR
+from codepi.templates.artifacts import TEMPLATES, ARTIFACT_DIR
 
 
 def test_templates_contains_all_artifacts():

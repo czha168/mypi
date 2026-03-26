@@ -437,7 +437,7 @@ class StreamingRenderer:
 | `interactive` | `mypi` | Full TUI experience |
 | `print` | `mypi --print "prompt"` | Streaming stdout, scriptable |
 | `rpc` | `mypi --rpc` | JSONL subprocess protocol |
-| `sdk` | `from mypi.modes.sdk import SDK` | Embeddable Python API |
+| `sdk` | `from codepi.modes.sdk import SDK` | Embeddable Python API |
 
 #### Print Mode
 ```python

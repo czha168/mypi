@@ -1,8 +1,8 @@
 import pytest
 from unittest.mock import MagicMock
-from mypi.modes.sdk import SDK
-from mypi.ai.provider import TokenEvent, DoneEvent, TokenUsage
-from mypi.core.session_manager import SessionManager
+from codepi.modes.sdk import SDK
+from codepi.ai.provider import TokenEvent, DoneEvent, TokenUsage
+from codepi.core.session_manager import SessionManager
 
 
 def make_mock_provider(events):

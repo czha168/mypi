@@ -1,7 +1,7 @@
 import pytest
 from pathlib import Path
-from mypi.tools.builtins import ReadTool, WriteTool, EditTool, BashTool, FindTool, GrepTool, LsTool
-from mypi.tools.base import ToolResult
+from codepi.tools.builtins import ReadTool, WriteTool, EditTool, BashTool, FindTool, GrepTool, LsTool
+from codepi.tools.base import ToolResult
 
 
 @pytest.mark.asyncio

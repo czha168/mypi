@@ -1,8 +1,8 @@
-# mypi User Guide
+# codepi User Guide
 
 ## Table of Contents
 
-1. [What is mypi](#what-is-mypi)
+1. [What is codepi](#what-is-codepi)
 2. [Installation](#installation)
 3. [Configuration](#configuration)
    - [Config file structure](#config-file-structure)
@@ -33,25 +33,25 @@
 
 ---
 
-## What is mypi
+## What is codepi
 
-mypi is a minimalist, terminal-based coding assistant written in Python. It connects to any OpenAI-compatible LLM API and gives the model a set of file system and shell tools to read, edit, and run code on your behalf.
+codepi is a minimalist, terminal-based coding assistant written in Python. It connects to any OpenAI-compatible LLM API (Ollama by default) and gives the model a set of file system and shell tools to read, edit, and run code on your behalf.
 
 The design philosophy is deliberate minimalism: the core ships with exactly seven tools and a simple extension system. There are no built-in sub-agents, no planning modes, and no workflow automation. If you need those, you add them as extensions or skills.
 
-mypi runs as a standard CLI program. It reads your question, sends it to the LLM along with any relevant tool calls, and streams the response back to your terminal.
+codepi runs as a standard CLI program. It reads your question, sends it to the LLM along with any relevant tool calls, and streams the response back to your terminal.
 
 ---
 
 ## Installation
 
-mypi requires Python 3.11 or later.
+codepi requires Python 3.12 or later.
 
 **From source:**
 
 ```bash
 git clone <repository-url>
-cd mypi
+cd codepi
 pip install -e .
 ```
 
@@ -61,7 +61,7 @@ pip install -e .
 pip install -e ".[dev]"
 ```
 
-After installation the `mypi` command is available on your PATH.
+After installation the `codepi` command is available on your PATH.
 
 **Runtime dependencies installed automatically:**
 
@@ -79,42 +79,43 @@ After installation the `mypi` command is available on your PATH.
 
 ### Config file structure
 
-mypi looks for a configuration file at `~/.mypi/config.toml` by default. If the file does not exist, all defaults apply. You can specify a different path with `--config PATH`.
+codepi looks for a configuration file at `~/.codepi/config.toml` by default. If the file does not exist, all defaults apply. You can specify a different path with `--config PATH`.
 
 A complete config file:
 
 ```toml
 [provider]
-base_url = "https://api.openai.com/v1"
-api_key  = ""
-model    = "gpt-4o"
+base_url = "http://localhost:11434/v1"
+api_key  = "ollama"
+model    = "gpt-oss:20b-128k"
 
 [session]
 compaction_threshold = 0.80
 max_retries = 3
 
 [paths]
-sessions_dir   = "~/.mypi/sessions"
-skills_dir     = "~/.mypi/skills"
-extensions_dir = "~/.mypi/extensions"
+sessions_dir   = "~/.codepi/sessions"
+skills_dir     = "~/.codepi/skills"
+extensions_dir = "~/.codepi/extensions"
 ```
 
 You only need to include the keys you want to change from the defaults.
 
 ### Environment variables
 
-Two environment variables are checked before the config file:
+Three environment variables are checked before the config file:
 
 | Variable | Overrides |
 |---|---|
-| `OPENAI_API_KEY` | `provider.api_key` |
-| `OPENAI_BASE_URL` | `provider.base_url` |
+| `OLLAMA_API_KEY` | `provider.api_key` |
+| `OLLAMA_BASE_URL` | `provider.base_url` |
+| `OLLAMA_MODEL` | `provider.model` |
 
-Environment variables take precedence over `config.toml`. This is useful for CI environments or when you have multiple API keys.
+Environment variables take precedence over `config.toml`. This is useful for CI environments or when you have multiple configurations.
 
 ```bash
-export OPENAI_API_KEY=sk-...
-mypi
+export OLLAMA_MODEL=gpt-oss:20b-128k
+codepi
 ```
 
 ### All options
@@ -123,9 +124,9 @@ mypi
 
 | Key | Default | Description |
 |---|---|---|
-| `base_url` | `https://api.openai.com/v1` | Base URL for any OpenAI-compatible API. Point to Ollama, Groq, Azure OpenAI, etc. |
-| `api_key` | `""` | API key. Set via env var for safety. |
-| `model` | `gpt-4o` | Default model name. Can be overridden per invocation with `--model`. |
+| `base_url` | `http://localhost:11434/v1` | Base URL for any OpenAI-compatible API. Point to Ollama, OpenAI, Groq, Azure OpenAI, etc. |
+| `api_key` | `ollama` | API key. Set via env var for safety. |
+| `model` | `gpt-oss:20b-128k` | Default model name. Can be overridden per invocation with `--model`. |
 
 **`[session]` section**
 
@@ -138,19 +139,26 @@ mypi
 
 | Key | Default | Description |
 |---|---|---|
-| `sessions_dir` | `~/.mypi/sessions` | Directory where session JSONL files are stored. |
-| `skills_dir` | `~/.mypi/skills` | Directory scanned for `.md` skill files. |
-| `extensions_dir` | `~/.mypi/extensions` | Directory scanned for `.py` extension files. |
+| `sessions_dir` | `~/.codepi/sessions` | Directory where session JSONL files are stored. |
+| `skills_dir` | `~/.codepi/skills` | Directory scanned for `.md` skill files. |
+| `extensions_dir` | `~/.codepi/extensions` | Directory scanned for `.py` extension files. |
 
 All path values support `~` expansion.
 
-**Using a different API provider:**
+**Using OpenAI instead of Ollama:**
 
 ```toml
 [provider]
-base_url = "http://localhost:11434/v1"  # Ollama
-api_key  = "ollama"
-model    = "codellama"
+base_url = "https://api.openai.com/v1"
+api_key  = ""
+model    = "gpt-4o"
+```
+
+Then set your API key via environment variable:
+
+```bash
+export OLLAMA_API_KEY=sk-...
+codepi
 ```
 
 ---
@@ -159,10 +167,10 @@ model    = "codellama"
 
 ### Interactive mode
 
-The default mode. Run `mypi` with no flags to start an interactive session.
+The default mode. Run `codepi` with no flags to start an interactive session.
 
 ```bash
-mypi
+codepi
 ```
 
 You get a prompt (`> `) at the bottom of the terminal. Type your question and press Enter. The assistant response streams to the screen in real time. Tool calls are shown inline as they execute.
@@ -183,10 +191,10 @@ The bottom toolbar always shows the current model name, the first 8 characters o
 **Command-line flags for interactive mode:**
 
 ```bash
-mypi --model gpt-4o-mini        # override model for this session
-mypi --session <SESSION_ID>     # resume an existing session
-mypi --skills-dir ./my-skills   # add an extra skills directory
-mypi --config ./project.toml    # use a project-local config file
+codepi --model llama3.2           # override model for this session
+codepi --session <SESSION_ID>     # resume an existing session
+codepi --skills-dir ./my-skills   # add an extra skills directory
+codepi --config ./project.toml    # use a project-local config file
 ```
 
 ### Print mode
@@ -194,7 +202,7 @@ mypi --config ./project.toml    # use a project-local config file
 Print mode sends a single prompt, streams the response to stdout, and exits. Designed for scripting and automation.
 
 ```bash
-mypi --print "Summarize the file README.md"
+codepi --print "Summarize the file README.md"
 ```
 
 Tool calls and their results are also written to stdout in a compact format:
@@ -207,18 +215,18 @@ Tool calls and their results are also written to stdout in a compact format:
 Combine with shell pipes and redirects as usual:
 
 ```bash
-mypi --print "List all Python files in src/" > file_list.txt
-mypi --print "Fix the bug in src/parser.py" 2>&1 | tee fix.log
+codepi --print "List all Python files in src/" > file_list.txt
+codepi --print "Fix the bug in src/parser.py" 2>&1 | tee fix.log
 ```
 
 All other flags (`--model`, `--session`, `--skills-dir`, etc.) work in print mode.
 
 ### RPC mode
 
-RPC mode runs mypi as a long-lived subprocess that accepts commands on stdin and emits events on stdout, both as newline-delimited JSON. Use this to integrate mypi into editors, IDEs, or other tools.
+RPC mode runs codepi as a long-lived subprocess that accepts commands on stdin and emits events on stdout, both as newline-delimited JSON. Use this to integrate codepi into editors, IDEs, or other tools.
 
 ```bash
-mypi --rpc
+codepi --rpc
 ```
 
 **Commands (send to stdin):**
@@ -253,16 +261,16 @@ A `done` event is emitted after each `prompt`, `steer`, or `follow_up` command c
 
 ### SDK mode
 
-The SDK is a Python API for embedding mypi inside another Python application. It is not exposed as a CLI mode; import it directly.
+The SDK is a Python API for embedding codepi inside another Python application. It is not exposed as a CLI mode; import it directly.
 
 ```python
 import asyncio
 from pathlib import Path
-from mypi.config import load_config
-from mypi.ai.openai_compat import OpenAICompatProvider
-from mypi.core.session_manager import SessionManager
-from mypi.tools.builtins import make_builtin_registry
-from mypi.modes.sdk import SDK
+from codepi.config import load_config
+from codepi.ai.openai_compat import OpenAICompatProvider
+from codepi.core.session_manager import SessionManager
+from codepi.tools.builtins import make_builtin_registry
+from codepi.modes.sdk import SDK
 
 async def main():
     config = load_config()
@@ -293,7 +301,7 @@ asyncio.run(main())
 
 ## Built-in Tools
 
-mypi ships with seven built-in tools. The LLM chooses which tools to invoke based on the conversation context.
+codepi ships with seven built-in tools. The LLM chooses which tools to invoke based on the conversation context.
 
 ### `read`
 
@@ -395,7 +403,7 @@ Skills use the same Markdown format as Claude Code slash commands.
 
 ### Creating a skill
 
-Create a `.md` file in your skills directory (`~/.mypi/skills/` by default). The file must start with YAML frontmatter.
+Create a `.md` file in your skills directory (`~/.codepi/skills/` by default). The file must start with YAML frontmatter.
 
 ```markdown
 ---
@@ -424,15 +432,15 @@ Always run the tests with `bash` tool after writing them to confirm they pass.
 
 ### Using skills
 
-Skills are loaded automatically at startup from `~/.mypi/skills/`. All `.md` files in the directory that have valid frontmatter are loaded.
+Skills are loaded automatically at startup from `~/.codepi/skills/`. All `.md` files in the directory that have valid frontmatter are loaded.
 
 You can add extra skill directories:
 
 ```bash
-mypi --skills-dir ./project-skills --skills-dir ~/shared-skills
+codepi --skills-dir ./project-skills --skills-dir ~/shared-skills
 ```
 
-All directories are merged. The default `~/.mypi/skills/` is always included.
+All directories are merged. The default `~/.codepi/skills/` is always included.
 
 **Lazy loading:** At startup, only skill metadata (name and description) is injected into the system prompt. This keeps the prompt lean. When the LLM determines a skill is relevant, it can invoke the `skill` tool to load the full content on-demand.
 
@@ -476,22 +484,22 @@ Two metadata fields enable workflow skills:
 | `workflow` | Identifies the skill as a workflow skill (template system reads this key) |
 | `command_id` | The filename for the generated command file (e.g., `opsx-propose` → `.claude/commands/opsx-propose.md`) |
 
-Package-managed workflow skills are bundled in `mypi/extensions/openspec/skills/` and loaded automatically. See [OpenSpec Core Profile](#openspec-core-profile) for the built-in workflow skills.
+Package-managed workflow skills are bundled in `codepi/extensions/openspec/skills/` and loaded automatically. See [OpenSpec Core Profile](#openspec-core-profile) for the built-in workflow skills.
 
 ---
 
 ## Template Generation
 
-The template system generates slash command files from workflow skills. This lets mypi's workflow skills work as native slash commands in Claude Code, Cursor, and Windsurf.
+The template system generates slash command files from workflow skills. This lets codepi's workflow skills work as native slash commands in Claude Code, Cursor, and Windsurf.
 
 ### Command files for Claude Code, Cursor, and Windsurf
 
 Generate command files for all three tools:
 
 ```bash
-mypi template generate --tool claude
-mypi template generate --tool cursor
-mypi template generate --tool windsurf
+codepi template generate --tool claude
+codepi template generate --tool cursor
+codepi template generate --tool windsurf
 ```
 
 Each tool has its own conventions:
@@ -502,25 +510,25 @@ Each tool has its own conventions:
 | Cursor | `.cursor/rules/` | YAML frontmatter + Markdown body |
 | Windsurf | `.windsurfrules/` | Plain text with description |
 
-Generated files contain the full skill body from the workflow skill. Running `/opsx:propose` in Claude Code will invoke the same instructions as typing it in mypi.
+Generated files contain the full skill body from the workflow skill. Running `/opsx:propose` in Claude Code will invoke the same instructions as typing it in codepi.
 
 List available templates:
 
 ```bash
-mypi template list
+codepi template list
 ```
 
 Validate that all workflow skills have complete content:
 
 ```bash
-mypi template validate
+codepi template validate
 ```
 
 ---
 
 ## OpenSpec Core Profile
 
-mypi ships with four built-in workflow skills that implement the [OpenSpec](https://github.com/Fission-AI/OpenSpec) core profile. These skills guide the LLM through a structured change workflow: propose → explore → apply → archive.
+codepi ships with four built-in workflow skills that implement the [OpenSpec](https://github.com/Fission-AI/OpenSpec) core profile. These skills guide the LLM through a structured change workflow: propose → explore → apply → archive.
 
 ### The four commands
 
@@ -531,7 +539,7 @@ mypi ships with four built-in workflow skills that implement the [OpenSpec](http
 | `/opsx:apply` | Implement tasks from the checklist, marking each complete as you go |
 | `/opsx:archive` | Finalize a completed change by moving it to the archive |
 
-These commands are available in mypi's interactive, print, and RPC modes. They also work as slash commands in Claude Code, Cursor, and Windsurf after running `mypi template generate --tool <tool>`.
+These commands are available in codepi's interactive, print, and RPC modes. They also work as slash commands in Claude Code, Cursor, and Windsurf after running `codepi template generate --tool <tool>`.
 
 ### How it works
 
@@ -630,9 +638,9 @@ Archived to: openspec/changes/archive/2026-03-20-add-dark-mode/
 
 ### How sessions work
 
-Every mypi run is associated with a session. A session is a single JSONL file stored in `~/.mypi/sessions/`. Each line in the file is a JSON object called a session entry.
+Every codepi run is associated with a session. A session is a single JSONL file stored in `~/.codepi/sessions/`. Each line in the file is a JSON object called a session entry.
 
-A new session is created automatically when you start mypi without `--session`. The session ID (a UUID) is shown in the terminal toolbar.
+A new session is created automatically when you start codepi without `--session`. The session ID (a UUID) is shown in the terminal toolbar.
 
 Session entries are written append-only as the conversation progresses. The types of entries are:
 
@@ -648,18 +656,24 @@ Session entries are written append-only as the conversation progresses. The type
 Pass the session ID to `--session`:
 
 ```bash
-mypi --session 550e8400-e29b-41d4-a716-446655440000
+codepi --session 550e8400-e29b-41d4-a716-446655440000
 ```
 
-You can list available sessions by listing files in `~/.mypi/sessions/`:
+You can list available sessions by listing files in `~/.codepi/sessions/`:
 
 ```bash
-ls ~/.mypi/sessions/
+ls ~/.codepi/sessions/
+```
+
+You can list available sessions by listing files in `~/.codepi/sessions/`:
+
+```bash
+ls ~/.codepi/sessions/
 ```
 
 ### Branches
 
-Sessions have a tree structure. Each entry has a `parentId` pointing to the previous entry. When you resume a session that has multiple leaf nodes (branches), mypi lists them and asks you to pick one:
+Sessions have a tree structure. Each entry has a `parentId` pointing to the previous entry. When you resume a session that has multiple leaf nodes (branches), codepi lists them and asks you to pick one:
 
 ```
 Session has 2 branches. Select one to resume:
@@ -674,7 +688,7 @@ Branching is currently managed internally by extensions or via the `SessionManag
 
 ### Auto-compaction
 
-When the number of input tokens approaches `compaction_threshold` × context window size (default: 80% of 128,000 tokens), mypi automatically summarizes the conversation. The summary is written as a `compaction` entry. On the next turn, older messages are discarded and replaced by the summary, keeping the context within bounds without losing important history.
+When the number of input tokens approaches `compaction_threshold` × context window size (default: 80% of 128,000 tokens), codepi automatically summarizes the conversation. The summary is written as a `compaction` entry. On the next turn, older messages are discarded and replaced by the summary, keeping the context within bounds without losing important history.
 
 The compaction summary is generated by the same model using a dedicated prompt. It preserves key decisions, file names, and code changes discussed.
 
@@ -703,23 +717,29 @@ The compaction summary is generated by the same model using a dedicated prompt. 
 **Run in a CI pipeline:**
 
 ```bash
-mypi --print "Run the test suite and report any failures" \
-     --model gpt-4o \
+codepi --print "Run the test suite and report any failures" \
+     --model gpt-oss:20b-128k \
      --config ./ci-config.toml
 ```
 
-**Use a local model via Ollama:**
+**Use a different model via Ollama:**
 
 ```bash
-OPENAI_BASE_URL=http://localhost:11434/v1 \
-OPENAI_API_KEY=ollama \
-mypi --model codellama
+codepi --model llama3.2
+```
+
+**Use OpenAI instead of Ollama:**
+
+```bash
+OLLAMA_BASE_URL=https://api.openai.com/v1 \
+OLLAMA_API_KEY=sk-... \
+codepi --model gpt-4o
 ```
 
 **Chain multiple prompts in a script:**
 
 ```bash
 SESSION=$(python -c "import uuid; print(uuid.uuid4())")
-mypi --print "Audit src/ for security issues" --session $SESSION
-mypi --print "Fix the issues you found" --session $SESSION
+codepi --print "Audit src/ for security issues" --session $SESSION
+codepi --print "Fix the issues you found" --session $SESSION
 ```

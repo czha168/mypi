@@ -4,7 +4,7 @@ import pytest
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from mypi.tools.lsp.client import LSPClientManager, NO_SERVER_ERROR
+from codepi.tools.lsp.client import LSPClientManager, NO_SERVER_ERROR
 
 
 class TestLSPClientManager:
@@ -28,7 +28,7 @@ class TestLSPClientManager:
 
     @pytest.mark.asyncio
     async def test_detect_server_priority(self):
-        with patch("mypi.tools.lsp.client.shutil.which") as mock_which:
+        with patch("codepi.tools.lsp.client.shutil.which") as mock_which:
             mock_which.side_effect = lambda cmd: cmd == "pyright-langserver"
 
             result = LSPClientManager.detect_server()
@@ -36,7 +36,7 @@ class TestLSPClientManager:
 
     @pytest.mark.asyncio
     async def test_detect_server_falls_back_to_pylsp(self):
-        with patch("mypi.tools.lsp.client.shutil.which") as mock_which:
+        with patch("codepi.tools.lsp.client.shutil.which") as mock_which:
             mock_which.side_effect = lambda cmd: cmd == "pylsp"
 
             result = LSPClientManager.detect_server()
@@ -44,7 +44,7 @@ class TestLSPClientManager:
 
     @pytest.mark.asyncio
     async def test_detect_server_falls_back_to_jedi(self):
-        with patch("mypi.tools.lsp.client.shutil.which") as mock_which:
+        with patch("codepi.tools.lsp.client.shutil.which") as mock_which:
             mock_which.side_effect = lambda cmd: cmd == "jedi-language-server"
 
             result = LSPClientManager.detect_server()
@@ -52,7 +52,7 @@ class TestLSPClientManager:
 
     @pytest.mark.asyncio
     async def test_detect_server_returns_none_when_nothing_available(self):
-        with patch("mypi.tools.lsp.client.shutil.which", return_value=None):
+        with patch("codepi.tools.lsp.client.shutil.which", return_value=None):
             result = LSPClientManager.detect_server()
             assert result is None
 

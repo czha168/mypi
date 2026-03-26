@@ -3,7 +3,7 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "mypi"
+name = "codepi"
 version = "0.1.0"
 requires-python = ">=3.12"
 dependencies = [
@@ -16,7 +16,7 @@ dependencies = [
 ]
 
 [project.scripts]
-mypi = "mypi.__main__:main"
+codepi = "codepi.__main__:main"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

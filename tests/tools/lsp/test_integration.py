@@ -1,8 +1,21 @@
 from __future__ import annotations
 
+import sys
 import pytest
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
+
+
+class MockPosition:
+    def __init__(self, line: int, character: int):
+        self.line = line
+        self.character = character
+
+
+@pytest.fixture(autouse=True)
+def mock_lsp_client():
+    with patch.dict(sys.modules, {"lsp_client": MagicMock(Position=MockPosition)}):
+        yield
 
 
 class MockLSPClient:
@@ -43,7 +56,7 @@ class MockLSPClient:
 class TestLSPIntegration:
     @pytest.mark.asyncio
     async def test_tool_returns_graceful_error_without_lsp_server(self, tmp_path):
-        from mypi.tools.lsp.goto_definition import LSPGotoDefinitionTool
+        from codepi.tools.lsp.goto_definition import LSPGotoDefinitionTool
 
         test_file = tmp_path / "test.py"
         test_file.write_text("def foo(): pass")
@@ -51,7 +64,7 @@ class TestLSPIntegration:
         tool = LSPGotoDefinitionTool()
 
         with patch.object(
-            tool.__class__.__bases__[0],
+            LSPGotoDefinitionTool,
             "_get_client",
             side_effect=RuntimeError("No Python LSP server found"),
         ):
@@ -61,70 +74,70 @@ class TestLSPIntegration:
 
     @pytest.mark.asyncio
     async def test_goto_definition_with_mock_server(self, sample_python_project):
-        from mypi.tools.lsp.goto_definition import LSPGotoDefinitionTool
+        from codepi.tools.lsp.goto_definition import LSPGotoDefinitionTool
 
         mock_client = MockLSPClient()
 
         tool = LSPGotoDefinitionTool()
         main_py = sample_python_project / "src" / "main.py"
 
-        with patch.object(tool, "_get_client", return_value=mock_client):
+        with patch.object(LSPGotoDefinitionTool, "_get_client", return_value=mock_client):
             result = await tool.execute(str(main_py), 5, 20)
             assert result.error is None
             assert result.output == "No definition found."
 
     @pytest.mark.asyncio
     async def test_find_references_with_mock_server(self, sample_python_project):
-        from mypi.tools.lsp.find_references import LSPFindReferencesTool
+        from codepi.tools.lsp.find_references import LSPFindReferencesTool
 
         mock_client = MockLSPClient()
 
         tool = LSPFindReferencesTool()
         models_py = sample_python_project / "src" / "models.py"
 
-        with patch.object(tool, "_get_client", return_value=mock_client):
+        with patch.object(LSPFindReferencesTool, "_get_client", return_value=mock_client):
             result = await tool.execute(str(models_py), 1, 7)
             assert result.error is None
             assert result.output == "No references found."
 
     @pytest.mark.asyncio
     async def test_diagnostics_with_mock_server(self, sample_python_project):
-        from mypi.tools.lsp.diagnostics import LSPDiagnosticsTool
+        from codepi.tools.lsp.diagnostics import LSPDiagnosticsTool
 
         mock_client = MockLSPClient()
 
         tool = LSPDiagnosticsTool()
         models_py = sample_python_project / "src" / "models.py"
 
-        with patch.object(tool, "_get_client", return_value=mock_client):
+        with patch.object(LSPDiagnosticsTool, "_get_client", return_value=mock_client):
             result = await tool.execute(str(models_py))
             assert result.error is None
             assert result.output == "No diagnostics found."
 
     @pytest.mark.asyncio
     async def test_hover_with_mock_server(self, sample_python_project):
-        from mypi.tools.lsp.hover import LSPHoverTool
+        from codepi.tools.lsp.hover import LSPHoverTool
 
         mock_client = MockLSPClient()
 
         tool = LSPHoverTool()
         models_py = sample_python_project / "src" / "models.py"
 
-        with patch.object(tool, "_get_client", return_value=mock_client):
+        with patch.object(LSPHoverTool, "_get_client", return_value=mock_client):
             result = await tool.execute(str(models_py), 1, 7)
             assert result.error is None
             assert result.output == "No hover information available."
 
     @pytest.mark.asyncio
     async def test_rename_dry_run_with_mock_server(self, sample_python_project):
-        from mypi.tools.lsp.rename import LSPRenameTool
+        from codepi.tools.lsp.rename import LSPRenameTool
 
         mock_client = MockLSPClient()
 
         tool = LSPRenameTool()
         models_py = sample_python_project / "src" / "models.py"
 
-        with patch.object(tool, "_get_client", return_value=mock_client):
+        with patch.object(LSPRenameTool, "_get_client", return_value=mock_client):
             result = await tool.execute(str(models_py), 1, 7, "Person", dry_run=True)
             assert result.error is None
             assert result.output == "No changes to apply."

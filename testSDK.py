@@ -1,10 +1,10 @@
 import asyncio
 from pathlib import Path
-from mypi.config import load_config
-from mypi.ai.openai_compat import OpenAICompatProvider
-from mypi.core.session_manager import SessionManager
-from mypi.tools.builtins import make_builtin_registry
-from mypi.modes.sdk import SDK
+from codepi.config import load_config
+from codepi.ai.openai_compat import OpenAICompatProvider
+from codepi.core.session_manager import SessionManager
+from codepi.tools.builtins import make_builtin_registry
+from codepi.modes.sdk import SDK
    
 config = load_config()
 

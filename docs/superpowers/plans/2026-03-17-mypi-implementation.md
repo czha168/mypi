@@ -176,14 +176,14 @@ git commit -m "feat: scaffold mypi package structure"
 
 ```python
 # tests/core/test_events.py
-from mypi.core.events import (
+from codepi.core.events import (
     BeforeAgentStartEvent, BeforeProviderRequestEvent,
     ToolCallEvent, ToolResultEvent,
     SessionForkEvent, SessionTreeEvent,
     AutoCompactionStartEvent, AutoCompactionEndEvent,
     AutoRetryStartEvent, AutoRetryEndEvent,
 )
-from mypi.tools.base import ToolResult
+from codepi.tools.base import ToolResult
 
 
 def test_before_agent_start_event_is_mutable():
@@ -234,7 +234,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from mypi.tools.base import ToolResult
+    from codepi.tools.base import ToolResult
 
 
 # ---------------------------------------------------------------------------
@@ -346,7 +346,7 @@ git commit -m "feat: add typed event dataclasses and ToolResult stub"
 ```python
 # tests/ai/test_provider.py
 import pytest
-from mypi.ai.provider import LLMProvider, TokenEvent, LLMToolCallEvent, DoneEvent, TokenUsage
+from codepi.ai.provider import LLMProvider, TokenEvent, LLMToolCallEvent, DoneEvent, TokenUsage
 
 
 def test_provider_event_types():
@@ -448,7 +448,7 @@ git commit -m "feat: add LLMProvider ABC and ProviderEvent types"
 # Append to tests/ai/test_provider.py
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
-from mypi.ai.openai_compat import OpenAICompatProvider
+from codepi.ai.openai_compat import OpenAICompatProvider
 
 
 @pytest.mark.asyncio
@@ -522,7 +522,7 @@ from __future__ import annotations
 import json
 from typing import AsyncIterator
 import openai
-from mypi.ai.provider import LLMProvider, ProviderEvent, TokenEvent, LLMToolCallEvent, DoneEvent, TokenUsage
+from codepi.ai.provider import LLMProvider, ProviderEvent, TokenEvent, LLMToolCallEvent, DoneEvent, TokenUsage
 
 
 class OpenAICompatProvider(LLMProvider):
@@ -616,7 +616,7 @@ git commit -m "feat: implement OpenAI-compatible streaming provider"
 import json
 import pytest
 from pathlib import Path
-from mypi.core.session_manager import SessionManager, SessionEntry
+from codepi.core.session_manager import SessionManager, SessionEntry
 
 
 def test_append_creates_jsonl_file(tmp_sessions_dir):
@@ -1043,8 +1043,8 @@ git commit -m "feat: add session migration v1→v2→v3"
 ```python
 # tests/tools/test_base.py
 import pytest
-from mypi.tools.base import Tool, ToolResult, ToolRegistry, ExtensionRunner
-from mypi.core.events import ToolCallEvent, ToolResultEvent
+from codepi.tools.base import Tool, ToolResult, ToolRegistry, ExtensionRunner
+from codepi.core.events import ToolCallEvent, ToolResultEvent
 
 
 class EchoTool(Tool):
@@ -1110,7 +1110,7 @@ import asyncio
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Any, Protocol, runtime_checkable
-from mypi.core.events import ToolCallEvent, ToolResultEvent
+from codepi.core.events import ToolCallEvent, ToolResultEvent
 
 
 @dataclass
@@ -1221,8 +1221,8 @@ git commit -m "feat: implement Tool ABC, ToolRegistry, and ExtensionRunner proto
 # tests/tools/test_builtins.py
 import pytest
 from pathlib import Path
-from mypi.tools.builtins import ReadTool, WriteTool, EditTool
-from mypi.tools.base import ToolResult
+from codepi.tools.builtins import ReadTool, WriteTool, EditTool
+from codepi.tools.base import ToolResult
 
 
 @pytest.mark.asyncio
@@ -1307,7 +1307,7 @@ from __future__ import annotations
 import asyncio
 import json
 from pathlib import Path
-from mypi.tools.base import Tool, ToolResult
+from codepi.tools.base import Tool, ToolResult
 
 
 class ReadTool(Tool):
@@ -1415,7 +1415,7 @@ git commit -m "feat: implement read, write, edit built-in tools"
 
 ```python
 # Append to tests/tools/test_builtins.py
-from mypi.tools.builtins import BashTool, FindTool, GrepTool, LsTool
+from codepi.tools.builtins import BashTool, FindTool, GrepTool, LsTool
 
 
 @pytest.mark.asyncio
@@ -1626,7 +1626,7 @@ class LsTool(Tool):
 
 def make_builtin_registry() -> "ToolRegistry":
     """Create a ToolRegistry pre-populated with all 7 built-in tools."""
-    from mypi.tools.base import ToolRegistry
+    from codepi.tools.base import ToolRegistry
     reg = ToolRegistry()
     for tool in [ReadTool(), WriteTool(), EditTool(), BashTool(), FindTool(), GrepTool(), LsTool()]:
         reg.register(tool)
@@ -1661,12 +1661,12 @@ git commit -m "feat: implement bash, find, grep, ls built-in tools"
 ```python
 # tests/extensions/test_base.py
 import pytest
-from mypi.extensions.base import Extension, UIComponents
-from mypi.core.events import (
+from codepi.extensions.base import Extension, UIComponents
+from codepi.core.events import (
     BeforeAgentStartEvent, ToolCallEvent, ToolResultEvent,
     SessionForkEvent, SessionTreeEvent
 )
-from mypi.tools.base import ToolResult
+from codepi.tools.base import ToolResult
 
 
 class NullExtension(Extension):
@@ -1727,11 +1727,11 @@ from dataclasses import dataclass, field
 from typing import Callable, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from mypi.core.events import (
+    from codepi.core.events import (
         BeforeAgentStartEvent, BeforeProviderRequestEvent,
         ToolCallEvent, ToolResultEvent, SessionForkEvent, SessionTreeEvent
     )
-    from mypi.tools.base import Tool
+    from codepi.tools.base import Tool
 
 
 @dataclass
@@ -1804,8 +1804,8 @@ git commit -m "feat: implement Extension ABC and UIComponents"
 # tests/extensions/test_skill_loader.py
 import pytest
 from pathlib import Path
-from mypi.extensions.skill_loader import SkillLoader
-from mypi.core.events import BeforeAgentStartEvent
+from codepi.extensions.skill_loader import SkillLoader
+from codepi.core.events import BeforeAgentStartEvent
 
 
 def write_skill(skills_dir: Path, name: str, content: str):
@@ -1870,7 +1870,7 @@ Expected: ImportError.
 from __future__ import annotations
 from pathlib import Path
 import yaml
-from mypi.core.events import BeforeAgentStartEvent
+from codepi.core.events import BeforeAgentStartEvent
 
 
 def _parse_skill(path: Path) -> dict | None:
@@ -1947,15 +1947,15 @@ git commit -m "feat: implement Claude Code–compatible skill loader"
 import pytest
 import time
 from pathlib import Path
-from mypi.extensions.base import Extension
-from mypi.extensions.loader import ExtensionLoader
+from codepi.extensions.base import Extension
+from codepi.extensions.loader import ExtensionLoader
 
 
 @pytest.fixture
 def simple_extension_file(tmp_extensions_dir):
     ext_file = tmp_extensions_dir / "my_ext.py"
     ext_file.write_text("""
-from mypi.extensions.base import Extension
+from codepi.extensions.base import Extension
 
 class MyExtension(Extension):
     name = "my-extension"
@@ -2001,7 +2001,7 @@ import inspect
 import logging
 import sys
 from pathlib import Path
-from mypi.extensions.base import Extension
+from codepi.extensions.base import Extension
 
 logger = logging.getLogger(__name__)
 
@@ -2098,10 +2098,10 @@ git commit -m "feat: implement extension loader with hot-reload via watchdog"
 # tests/core/test_agent_session.py
 import pytest
 from unittest.mock import AsyncMock, MagicMock
-from mypi.core.agent_session import AgentSession
-from mypi.ai.provider import TokenEvent, LLMToolCallEvent, DoneEvent, TokenUsage
-from mypi.core.session_manager import SessionManager
-from mypi.tools.builtins import make_builtin_registry
+from codepi.core.agent_session import AgentSession
+from codepi.ai.provider import TokenEvent, LLMToolCallEvent, DoneEvent, TokenUsage
+from codepi.core.session_manager import SessionManager
+from codepi.tools.builtins import make_builtin_registry
 
 
 def make_mock_provider(events):
@@ -2139,7 +2139,7 @@ async def test_prompt_executes_tool_calls(tmp_sessions_dir):
     sm = SessionManager(tmp_sessions_dir)
     sm.new_session(model="gpt-4o")
 
-    from mypi.tools.base import Tool, ToolResult, ToolRegistry
+    from codepi.tools.base import Tool, ToolResult, ToolRegistry
     class EchoTool(Tool):
         name = "echo"
         description = "echo"
@@ -2186,16 +2186,16 @@ from __future__ import annotations
 import asyncio
 import logging
 from typing import Callable
-from mypi.ai.provider import LLMProvider, TokenEvent, LLMToolCallEvent, DoneEvent
-from mypi.core.events import (
+from codepi.ai.provider import LLMProvider, TokenEvent, LLMToolCallEvent, DoneEvent
+from codepi.core.events import (
     BeforeAgentStartEvent, BeforeProviderRequestEvent,
     ToolCallEvent, ToolResultEvent, TokenStreamEvent,
     AutoRetryStartEvent, AutoRetryEndEvent,
     AutoCompactionStartEvent, AutoCompactionEndEvent,
 )
-from mypi.core.session_manager import SessionManager, SessionEntry
-from mypi.extensions.base import Extension
-from mypi.tools.base import ToolRegistry, ToolResult
+from codepi.core.session_manager import SessionManager, SessionEntry
+from codepi.extensions.base import Extension
+from codepi.tools.base import ToolRegistry, ToolResult
 
 logger = logging.getLogger(__name__)
 
@@ -2485,7 +2485,7 @@ Add `_run_auto_compaction` to `AgentSession`:
 ```python
 async def _run_auto_compaction(self) -> None:
     """Summarize current context and store a CompactionEntry."""
-    from mypi.core.session_manager import SessionEntry
+    from codepi.core.session_manager import SessionEntry
     context = self.session_manager.build_context()
     if not context:
         return
@@ -2499,7 +2499,7 @@ async def _run_auto_compaction(self) -> None:
     async for event in self.provider.stream(
         messages=summary_prompt, tools=[], model=self.model, system=""
     ):
-        from mypi.ai.provider import TokenEvent
+        from codepi.ai.provider import TokenEvent
         if isinstance(event, TokenEvent):
             summary_parts.append(event.text)
     summary = "".join(summary_parts)
@@ -2688,9 +2688,9 @@ import pytest
 import asyncio
 from io import StringIO
 from unittest.mock import MagicMock, AsyncMock, patch
-from mypi.modes.print_mode import PrintMode
-from mypi.ai.provider import TokenEvent, DoneEvent, TokenUsage
-from mypi.core.session_manager import SessionManager
+from codepi.modes.print_mode import PrintMode
+from codepi.ai.provider import TokenEvent, DoneEvent, TokenUsage
+from codepi.core.session_manager import SessionManager
 
 
 def make_mock_provider(events):
@@ -2723,8 +2723,8 @@ async def test_print_mode_outputs_tokens_to_stdout(tmp_sessions_dir):
 
 @pytest.mark.asyncio
 async def test_print_mode_shows_tool_calls(tmp_sessions_dir):
-    from mypi.ai.provider import LLMToolCallEvent
-    from mypi.tools.base import Tool, ToolResult, ToolRegistry
+    from codepi.ai.provider import LLMToolCallEvent
+    from codepi.tools.base import Tool, ToolResult, ToolRegistry
 
     class EchoTool(Tool):
         name = "echo"; description = "echo"
@@ -2762,10 +2762,10 @@ Expected: ImportError.
 from __future__ import annotations
 import sys
 from typing import IO
-from mypi.core.agent_session import AgentSession
-from mypi.core.session_manager import SessionManager
-from mypi.ai.provider import LLMProvider
-from mypi.tools.base import ToolRegistry
+from codepi.core.agent_session import AgentSession
+from codepi.core.session_manager import SessionManager
+from codepi.ai.provider import LLMProvider
+from codepi.tools.base import ToolRegistry
 
 
 class PrintMode:
@@ -2836,9 +2836,9 @@ import pytest
 import asyncio
 from io import StringIO, BytesIO
 from unittest.mock import MagicMock
-from mypi.modes.rpc import RPCMode
-from mypi.ai.provider import TokenEvent, DoneEvent, TokenUsage
-from mypi.core.session_manager import SessionManager
+from codepi.modes.rpc import RPCMode
+from codepi.ai.provider import TokenEvent, DoneEvent, TokenUsage
+from codepi.core.session_manager import SessionManager
 
 
 def make_mock_provider(events):
@@ -2890,10 +2890,10 @@ from __future__ import annotations
 import asyncio
 import json
 import sys
-from mypi.core.agent_session import AgentSession
-from mypi.core.session_manager import SessionManager
-from mypi.ai.provider import LLMProvider
-from mypi.tools.base import ToolRegistry
+from codepi.core.agent_session import AgentSession
+from codepi.core.session_manager import SessionManager
+from codepi.ai.provider import LLMProvider
+from codepi.tools.base import ToolRegistry
 
 
 class RPCMode:
@@ -2997,9 +2997,9 @@ git commit -m "feat: implement JSONL RPC mode"
 # tests/modes/test_sdk.py
 import pytest
 from unittest.mock import MagicMock
-from mypi.modes.sdk import SDK
-from mypi.ai.provider import TokenEvent, DoneEvent, TokenUsage
-from mypi.core.session_manager import SessionManager
+from codepi.modes.sdk import SDK
+from codepi.ai.provider import TokenEvent, DoneEvent, TokenUsage
+from codepi.core.session_manager import SessionManager
 
 
 def make_mock_provider(events):
@@ -3057,10 +3057,10 @@ Expected: ImportError.
 from __future__ import annotations
 import asyncio
 from typing import AsyncIterator
-from mypi.core.agent_session import AgentSession
-from mypi.core.session_manager import SessionManager
-from mypi.ai.provider import LLMProvider
-from mypi.tools.base import ToolRegistry
+from codepi.core.agent_session import AgentSession
+from codepi.core.session_manager import SessionManager
+from codepi.ai.provider import LLMProvider
+from codepi.tools.base import ToolRegistry
 
 
 class SDK:
@@ -3262,8 +3262,8 @@ from __future__ import annotations
 from prompt_toolkit import PromptSession
 from prompt_toolkit.history import InMemoryHistory
 from prompt_toolkit.formatted_text import HTML
-from mypi.tui.components import make_keybindings, default_toolbar
-from mypi.tui.renderer import StreamingRenderer
+from codepi.tui.components import make_keybindings, default_toolbar
+from codepi.tui.renderer import StreamingRenderer
 from rich.console import Console
 
 
@@ -3304,12 +3304,12 @@ No automated tests. Manual verification after Task 23.
 from __future__ import annotations
 import asyncio
 import sys
-from mypi.core.agent_session import AgentSession
-from mypi.core.session_manager import SessionManager
-from mypi.ai.provider import LLMProvider
-from mypi.tools.base import ToolRegistry
-from mypi.tui.app import TUIApp
-from mypi.extensions.base import Extension
+from codepi.core.agent_session import AgentSession
+from codepi.core.session_manager import SessionManager
+from codepi.ai.provider import LLMProvider
+from codepi.tools.base import ToolRegistry
+from codepi.tui.app import TUIApp
+from codepi.extensions.base import Extension
 
 
 class InteractiveMode:
@@ -3384,13 +3384,13 @@ import argparse
 import asyncio
 import sys
 from pathlib import Path
-from mypi.config import load_config
-from mypi.ai.openai_compat import OpenAICompatProvider
-from mypi.core.session_manager import SessionManager
-from mypi.tools.builtins import make_builtin_registry
-from mypi.extensions.loader import ExtensionLoader
-from mypi.extensions.skill_loader import SkillLoader
-from mypi.core.events import BeforeAgentStartEvent
+from codepi.config import load_config
+from codepi.ai.openai_compat import OpenAICompatProvider
+from codepi.core.session_manager import SessionManager
+from codepi.tools.builtins import make_builtin_registry
+from codepi.extensions.loader import ExtensionLoader
+from codepi.extensions.skill_loader import SkillLoader
+from codepi.core.events import BeforeAgentStartEvent
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -3482,7 +3482,7 @@ async def _run(args: argparse.Namespace) -> None:
     all_extensions = [SkillExtension()] + extensions
 
     # Wrap registry tools with extension runner
-    from mypi.core.agent_session import AgentSession
+    from codepi.core.agent_session import AgentSession
     class SimpleRunner:
         def __init__(self, exts):
             self._exts = exts
@@ -3505,19 +3505,19 @@ async def _run(args: argparse.Namespace) -> None:
     session_id = sm._session_id or "unknown"
 
     if args.print_prompt:
-        from mypi.modes.print_mode import PrintMode
+        from codepi.modes.print_mode import PrintMode
         mode = PrintMode(provider=provider, session_manager=sm, model=model,
                          tool_registry=registry, extensions=all_extensions)
         await mode.run(args.print_prompt)
 
     elif args.rpc:
-        from mypi.modes.rpc import RPCMode
+        from codepi.modes.rpc import RPCMode
         mode = RPCMode(provider=provider, session_manager=sm, model=model,
                        tool_registry=registry, extensions=all_extensions)
         await mode.run()
 
     else:
-        from mypi.modes.interactive import InteractiveMode
+        from codepi.modes.interactive import InteractiveMode
         mode = InteractiveMode(
             provider=provider, session_manager=sm, model=model,
             session_id=session_id,
@@ -3586,7 +3586,7 @@ Expected: prints a single word response to stdout.
 - [ ] **Verify package is importable**
 
 ```bash
-python -c "import mypi; from mypi.modes.sdk import SDK; print('OK')"
+python -c "import codepi; from codepi.modes.sdk import SDK; print('OK')"
 ```
 
 Expected: `OK`

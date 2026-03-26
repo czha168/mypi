@@ -1,4 +1,4 @@
-# mypi Developer Guide
+# codepi Developer Guide
 
 ## Table of Contents
 
@@ -6,12 +6,13 @@
    - [Layer diagram](#layer-diagram)
    - [Data flow](#data-flow)
 2. [Module Reference](#module-reference)
-   - [mypi/ai/](#mypiai)
-   - [mypi/core/](#mypicore)
-   - [mypi/tools/](#mypitools)
-   - [mypi/extensions/](#mypiextensions)
-   - [mypi/tui/](#mypitui)
-   - [mypi/modes/](#mypimodes)
+   - [codepi/ai/](#codepiai)
+   - [codepi/core/](#codepicore)
+   - [codepi/tools/](#codepitools)
+   - [codepi/extensions/](#codepiextensions)
+   - [codepi/templates/](#codepitemplates)
+   - [codepi/tui/](#codepitui)
+   - [codepi/modes/](#codepimodes)
 3. [Extension API](#extension-api)
    - [Writing a Python extension](#writing-a-python-extension)
    - [Hook methods reference](#hook-methods-reference)
@@ -37,6 +38,42 @@
 
 ### Layer diagram
 
+```
+┌─────────────────────────────────────────────────────────────┐
+│                         CLI / Entry Point                    │
+│                      codepi/__main__.py                      │
+└──────────────────────────┬──────────────────────────────────┘
+                           │
+          ┌────────────────┼────────────────┐
+          │                │                │
+    ┌─────▼──────┐  ┌──────▼──────┐  ┌─────▼──────┐  ┌──────────────┐
+    │ Interactive│  │   Print     │  │    RPC     │  │     SDK      │
+    │   Mode     │  │   Mode      │  │   Mode     │  │  (Python API)│
+    └─────┬──────┘  └──────┬──────┘  └─────┬──────┘  └──────┬───────┘
+          └────────────────┼────────────────┘                │
+                           │                                  │
+              ┌────────────▼────────────────────────────────-┘
+              │           codepi/core/agent_session.py        │
+              │                AgentSession                   │
+              │   prompt() / steer() / follow_up()           │
+              │   retry loop, auto-compaction, event hooks   │
+              └─────────────┬──────────────────┬─────────────┘
+                            │                  │
+              ┌─────────────▼───┐   ┌──────────▼────────────┐
+              │  codepi/ai/     │   │  codepi/core/          │
+              │  LLMProvider    │   │  SessionManager        │
+              │  (stream)       │   │  (JSONL persistence)   │
+              └─────────────────┘   └────────────────────────┘
+                            │
+              ┌─────────────▼───────────────────────────────┐
+              │  codepi/tools/ToolRegistry                   │
+              │  read  write  edit  bash  find  grep  ls    │
+              └──────────────────────────────────────────────┘
+                            │
+              ┌─────────────▼───────────────────────────────┐
+              │  codepi/extensions/                          │
+              │  Extension hook points + SkillLoader         │
+              └──────────────────────────────────────────────┘
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                         CLI / Entry Point                    │
@@ -99,7 +136,7 @@ A single conversation turn proceeds as follows:
 
 ## Module Reference
 
-### mypi/ai/
+### codepi/ai/
 
 **`provider.py`** — Abstract base class and shared data types.
 
@@ -113,8 +150,9 @@ A single conversation turn proceeds as follows:
 **`openai_compat.py`** — Concrete provider for any OpenAI-compatible REST API.
 
 - `OpenAICompatProvider(base_url, api_key, default_model)` — Wraps `openai.AsyncOpenAI`. Handles streaming tool call argument accumulation (arguments may arrive across multiple chunks).
+- Uses `getattr(chunk, "usage", None)` for Ollama compatibility (Ollama doesn't include usage in all streaming chunks).
 
-### mypi/core/
+### codepi/core/
 
 **`events.py`** — All event dataclasses used by the extension hook system.
 
@@ -148,7 +186,7 @@ Internal-only (not dispatched to extensions):
 - `AgentSession._handle_opsx_command(text)` — Loads the matching workflow skill and injects its body as the user message.
 - Callbacks: `on_token`, `on_tool_call`, `on_tool_result`, `on_error` — Set these on the instance before calling `prompt()`.
 
-### mypi/tools/
+### codepi/tools/
 
 **`base.py`** — Tool infrastructure.
 
@@ -165,7 +203,16 @@ Internal-only (not dispatched to extensions):
 
 - `SkillTool(skill_loader_getter)` — Tool that loads full skill content by name. Accepts a getter function returning the `SkillLoader` instance.
 
-### mypi/extensions/
+**`lsp/`** — LSP-powered tools for Python code intelligence.
+
+- `client.py` — `LSPClientManager` singleton that manages Python LSP server lifecycle (pyright, pylsp, or jedi-language-server).
+- `goto_definition.py` — `lsp_goto_definition` tool.
+- `find_references.py` — `lsp_find_references` tool.
+- `diagnostics.py` — `lsp_diagnostics` tool.
+- `hover.py` — `lsp_hover` tool.
+- `rename.py` — `lsp_rename` tool.
+
+### codepi/extensions/
 
 **`base.py`** — Extension ABC and UI types.
 
@@ -195,7 +242,7 @@ Internal-only (not dispatched to extensions):
 - `skills/opsx-apply.md` — Apply skill: implement tasks from the checklist.
 - `skills/opsx-archive.md` — Archive skill: finalize and move a change to archive.
 
-### mypi/templates/
+### codepi/templates/
 
 **`adapters.py`** — Tool-specific command file formatters.
 
@@ -212,7 +259,7 @@ Internal-only (not dispatched to extensions):
 - `TemplateRegistry.generate_commands(tool_id, output_dir)` — Generates command files for the specified tool. Returns list of generated `Path`s.
 - `TemplateRegistry.validate_parity()` — Checks all workflow skills have non-empty bodies and required metadata.
 
-**`cli.py`** — CLI subcommand for `mypi template`.
+**`cli.py`** — CLI subcommand for `codepi template`.
 
 - `add_template_parser(subparsers)` — Adds `template` subparser to an argparse parser.
 - `run_template_cmd(args)` — Dispatches to `list`, `generate`, or `validate` subcommands.
@@ -222,7 +269,7 @@ Internal-only (not dispatched to extensions):
 - `TEMPLATES` — Dict mapping artifact IDs (`"proposal"`, `"spec"`, `"design"`, `"tasks"`) to template content strings.
 - Templates are loaded at import time from the bundled `.md` files.
 
-### mypi/tui/
+### codepi/tui/
 
 **`renderer.py`** — Terminal output.
 
@@ -237,7 +284,7 @@ Internal-only (not dispatched to extensions):
 
 - `TUIApp(model, session_id, ...)` — Holds a `StreamingRenderer` and a `prompt_toolkit.PromptSession`. Call `get_input(prompt)` to await user input.
 
-### mypi/modes/
+### codepi/modes/
 
 **`interactive.py`** — `InteractiveMode` — The default user-facing mode. Wires `TUIApp` and `AgentSession` together.
 
@@ -416,8 +463,8 @@ A minimal extension:
 
 ```python
 # ~/.mypi/extensions/my_extension.py
-from mypi.extensions.base import Extension
-from mypi.core.events import BeforeAgentStartEvent
+from codepi.extensions.base import Extension
+from codepi.core.events import BeforeAgentStartEvent
 
 class MyExtension(Extension):
     name = "my-extension"
@@ -494,7 +541,7 @@ Fired after each tool executes. `event.result` is a `ToolResult` object.
 Use it to transform or filter tool output before it reaches the LLM:
 
 ```python
-from mypi.tools.base import ToolResult
+from codepi.tools.base import ToolResult
 
 async def on_tool_result(self, event: ToolResultEvent):
     if event.tool_name == "read" and len(event.result.output) > 5000:
@@ -525,8 +572,8 @@ Fired when the session tree changes. `event.leaf_id` is the new active leaf.
 Override `get_tools()` to return a list of `Tool` instances. These are registered in the tool registry before the session starts.
 
 ```python
-from mypi.extensions.base import Extension
-from mypi.tools.base import Tool, ToolResult
+from codepi.extensions.base import Extension
+from codepi.tools.base import Tool, ToolResult
 
 class MyTool(Tool):
     name = "fetch_url"
@@ -575,7 +622,7 @@ Shortcuts are registered with the `TUIApp`'s key bindings only in interactive mo
 Override `get_ui_components()` to return a `UIComponents` instance. All fields are optional callables that return strings rendered by `rich`.
 
 ```python
-from mypi.extensions.base import Extension, UIComponents
+from codepi.extensions.base import Extension, UIComponents
 
 class StatusExtension(Extension):
     name = "status-bar"
@@ -800,11 +847,11 @@ The `SDK` class provides an async Python API for embedding mypi in another appli
 
 ```python
 from pathlib import Path
-from mypi.config import load_config
-from mypi.ai.openai_compat import OpenAICompatProvider
-from mypi.core.session_manager import SessionManager
-from mypi.tools.builtins import make_builtin_registry
-from mypi.modes.sdk import SDK
+from codepi.config import load_config
+from codepi.ai.openai_compat import OpenAICompatProvider
+from codepi.core.session_manager import SessionManager
+from codepi.tools.builtins import make_builtin_registry
+from codepi.modes.sdk import SDK
 
 config = load_config()
 
@@ -868,8 +915,8 @@ async def main():
 ### Using extensions with the SDK
 
 ```python
-from mypi.extensions.base import Extension
-from mypi.core.events import BeforeAgentStartEvent
+from codepi.extensions.base import Extension
+from codepi.core.events import BeforeAgentStartEvent
 
 class LoggingExtension(Extension):
     name = "logger"
@@ -1030,7 +1077,7 @@ class MyNewTool(Tool):
 
 ```python
 def make_builtin_registry() -> "ToolRegistry":
-    from mypi.tools.base import ToolRegistry
+    from codepi.tools.base import ToolRegistry
     reg = ToolRegistry()
     for tool in [ReadTool(), WriteTool(), EditTool(), BashTool(),
                  FindTool(), GrepTool(), LsTool(), MyNewTool()]:  # add here

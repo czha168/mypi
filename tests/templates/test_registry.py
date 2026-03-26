@@ -1,7 +1,7 @@
 from pathlib import Path
-from mypi.extensions.skill_loader import Skill
-from mypi.templates.adapters import ClaudeAdapter, CursorAdapter, WindsurfAdapter, CommandContent
-from mypi.templates.registry import TemplateRegistry
+from codepi.extensions.skill_loader import Skill
+from codepi.templates.adapters import ClaudeAdapter, CursorAdapter, WindsurfAdapter, CommandContent
+from codepi.templates.registry import TemplateRegistry
 
 
 def test_claude_adapter_format():
@@ -76,7 +76,7 @@ Do the test thing.
 
 def test_validate_parity_empty_body():
     registry = TemplateRegistry([])
-    from mypi.templates.registry import WorkflowTemplate
+    from codepi.templates.registry import WorkflowTemplate
     skill = Skill("empty-wf", "", Path("."), body=None)
     wf = WorkflowTemplate(skill=skill, command_id="empty-wf", command_tags=[], command_category="Test")
     registry._workflows = {"empty-wf": wf}

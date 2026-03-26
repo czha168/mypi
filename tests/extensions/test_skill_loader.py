@@ -1,7 +1,7 @@
 import pytest
 from pathlib import Path
-from mypi.extensions.skill_loader import SkillLoader
-from mypi.core.events import BeforeAgentStartEvent
+from codepi.extensions.skill_loader import SkillLoader
+from codepi.core.events import BeforeAgentStartEvent
 
 
 def write_skill(skills_dir: Path, name: str, content: str):

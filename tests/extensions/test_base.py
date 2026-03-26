@@ -1,10 +1,10 @@
 import pytest
-from mypi.extensions.base import Extension, UIComponents
-from mypi.core.events import (
+from codepi.extensions.base import Extension, UIComponents
+from codepi.core.events import (
     BeforeAgentStartEvent, ToolCallEvent, ToolResultEvent,
     SessionForkEvent, SessionTreeEvent
 )
-from mypi.tools.base import ToolResult
+from codepi.tools.base import ToolResult
 
 
 class NullExtension(Extension):

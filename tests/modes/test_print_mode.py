@@ -1,9 +1,9 @@
 import pytest
 from io import StringIO
 from unittest.mock import MagicMock
-from mypi.modes.print_mode import PrintMode
-from mypi.ai.provider import TokenEvent, DoneEvent, TokenUsage
-from mypi.core.session_manager import SessionManager
+from codepi.modes.print_mode import PrintMode
+from codepi.ai.provider import TokenEvent, DoneEvent, TokenUsage
+from codepi.core.session_manager import SessionManager
 
 
 def make_mock_provider(events):
@@ -36,8 +36,8 @@ async def test_print_mode_outputs_tokens_to_stdout(tmp_sessions_dir):
 
 @pytest.mark.asyncio
 async def test_print_mode_shows_tool_calls(tmp_sessions_dir):
-    from mypi.ai.provider import LLMToolCallEvent
-    from mypi.tools.base import Tool, ToolResult, ToolRegistry
+    from codepi.ai.provider import LLMToolCallEvent
+    from codepi.tools.base import Tool, ToolResult, ToolRegistry
 
     class EchoTool(Tool):
         name = "echo"; description = "echo"

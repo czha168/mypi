@@ -1,6 +1,6 @@
 import pytest
-from mypi.extensions.skill_loader import SkillLoader
-from mypi.tools.skill_tool import SkillTool
+from codepi.extensions.skill_loader import SkillLoader
+from codepi.tools.skill_tool import SkillTool
 
 
 def write_skill(skills_dir, name, content):

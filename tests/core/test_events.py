@@ -1,11 +1,11 @@
-from mypi.core.events import (
+from codepi.core.events import (
     BeforeAgentStartEvent, BeforeProviderRequestEvent,
     ToolCallEvent, ToolResultEvent,
     SessionForkEvent, SessionTreeEvent,
     AutoCompactionStartEvent, AutoCompactionEndEvent,
     AutoRetryStartEvent, AutoRetryEndEvent,
 )
-from mypi.tools.base import ToolResult
+from codepi.tools.base import ToolResult
 
 
 def test_before_agent_start_event_is_mutable():

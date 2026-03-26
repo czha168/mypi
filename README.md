@@ -28,7 +28,7 @@ Requires Python 3.11+.
 export OPENAI_API_KEY=sk-...
 
 # Start an interactive session
-mypi
+codepi
 ```
 
 ### Installing an LSP Server (Recommended)
@@ -74,7 +74,7 @@ enabled = true   # Set to false to disable LSP tools
 ```bash
 export OPENAI_API_KEY=sk-...
 export OPENAI_BASE_URL=http://localhost:11434/v1  # Ollama
-mypi --model codellama
+codepi --model codellama
 ```
 
 ## Usage Modes
@@ -82,7 +82,7 @@ mypi --model codellama
 ### Interactive Mode (default)
 
 ```bash
-mypi
+codepi
 ```
 
 Full terminal UI with streaming output, tool call display, and keyboard shortcuts.
@@ -100,8 +100,8 @@ Full terminal UI with streaming output, tool call display, and keyboard shortcut
 Script-friendly single-shot mode:
 
 ```bash
-mypi --print "List Python files in src/"
-mypi --print "Fix the bug in parser.py" 2>&1 | tee fix.log
+codepi --print "List Python files in src/"
+codepi --print "Fix the bug in parser.py" 2>&1 | tee fix.log
 ```
 
 ### RPC Mode
@@ -109,7 +109,7 @@ mypi --print "Fix the bug in parser.py" 2>&1 | tee fix.log
 Integrate into editors/IDEs via JSONL stdin/stdout:
 
 ```bash
-mypi --rpc
+codepi --rpc
 ```
 
 ```json
@@ -123,10 +123,10 @@ mypi --rpc
 Embed in your application:
 
 ```python
-from mypi.modes.sdk import SDK
-from mypi.ai.openai_compat import OpenAICompatProvider
-from mypi.core.session_manager import SessionManager
-from mypi.tools.builtins import make_builtin_registry
+from codepi.modes.sdk import SDK
+from codepi.ai.openai_compat import OpenAICompatProvider
+from codepi.core.session_manager import SessionManager
+from codepi.tools.builtins import make_builtin_registry
 
 provider = OpenAICompatProvider(base_url="...", api_key="...")
 sm = SessionManager("~/.mypi/sessions")
@@ -152,7 +152,7 @@ response = await sdk.prompt("List files in the current directory")
 
 ## LSP Tools
 
-mypi includes 5 LSP-powered tools for semantic Python code intelligence. These tools communicate with a Python language server (pyright, pylsp, or jedi-language-server) to provide intelligent code navigation and analysis.
+codepi includes 5 LSP-powered tools for semantic Python code intelligence. These tools communicate with a Python language server (pyright, pylsp, or jedi-language-server) to provide intelligent code navigation and analysis.
 
 | Tool | Description |
 |------|-------------|
@@ -216,8 +216,8 @@ mypi includes 5 LSP-powered tools for semantic Python code intelligence. These t
 Drop `.py` files into `~/.mypi/extensions/`:
 
 ```python
-from mypi.extensions.base import Extension
-from mypi.core.events import BeforeAgentStartEvent
+from codepi.extensions.base import Extension
+from codepi.core.events import BeforeAgentStartEvent
 
 class MyExtension(Extension):
     name = "my-extension"
@@ -257,7 +257,7 @@ Place in `~/.mypi/skills/` or add directories with `--skills-dir`.
 Sessions are stored as JSONL files in `~/.mypi/sessions/`. Resume with:
 
 ```bash
-mypi --session 550e8400-e29b-41d4-a716-446655440000
+codepi --session 550e8400-e29b-41d4-a716-446655440000
 ```
 
 **Auto-compaction** triggers at 80% context window usage — the model summarizes conversation history to free up tokens.

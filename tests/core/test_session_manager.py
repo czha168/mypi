@@ -1,7 +1,7 @@
 import json
 import pytest
 from pathlib import Path
-from mypi.core.session_manager import SessionManager, SessionEntry
+from codepi.core.session_manager import SessionManager, SessionEntry
 
 
 def test_append_creates_jsonl_file(tmp_sessions_dir):

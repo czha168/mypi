@@ -1,24 +1,30 @@
 import pytest
 import os
-from mypi.ai.openai_compat import OpenAICompatProvider
-from mypi.core.agent_session import AgentSession
-from mypi.core.session_manager import SessionManager
-from mypi.tools.builtins import make_builtin_registry
+import httpx
+from codepi.ai.openai_compat import OpenAICompatProvider
+from codepi.core.agent_session import AgentSession
+from codepi.core.session_manager import SessionManager
+from codepi.tools.builtins import make_builtin_registry
 
 
 def get_real_provider():
-    """Create a real OpenAI-compatible provider using environment variables or defaults."""
-    base_url = os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1")
-    api_key = os.environ.get("OPENAI_API_KEY", "")
-    model = os.environ.get("OPENAI_MODEL", "gpt-4o")
+    """Create a real OpenAI-compatible provider using Ollama or environment overrides."""
+    base_url = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434/v1")
+    api_key = os.environ.get("OLLAMA_API_KEY", "ollama")
+    model = os.environ.get("OLLAMA_MODEL", "gpt-oss:20b-128k")
     return OpenAICompatProvider(base_url=base_url, api_key=api_key, default_model=model), model
 
 
-def skip_if_no_api_key():
-    """Skip test if no API key is available."""
-    api_key = os.environ.get("OPENAI_API_KEY", "")
-    if not api_key:
-        pytest.skip("OPENAI_API_KEY not set")
+def skip_if_no_ollama():
+    """Skip test if Ollama server is not running."""
+    base_url = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434/v1")
+    try:
+        with httpx.Client() as client:
+            resp = client.get(base_url.replace("/v1", "/api/tags"), timeout=2.0)
+            if resp.status_code != 200:
+                pytest.skip(f"Ollama server not responding at {base_url}")
+    except Exception as e:
+        pytest.skip(f"Ollama server not available: {e}")
 
 
 @pytest.fixture
@@ -40,7 +46,7 @@ def real_session(tmp_sessions_dir, real_provider):
 @pytest.mark.asyncio
 async def test_real_llm_simple_response(real_session):
     """Test that the LLM can respond to a simple prompt."""
-    skip_if_no_api_key()
+    skip_if_no_ollama()
     
     tokens = []
     real_session.on_token = lambda t: tokens.append(t)
@@ -54,7 +60,7 @@ async def test_real_llm_simple_response(real_session):
 @pytest.mark.asyncio
 async def test_real_llm_calls_ls_tool(tmp_sessions_dir):
     """Test that the LLM correctly calls the ls tool to list files."""
-    skip_if_no_api_key()
+    skip_if_no_ollama()
     
     provider, model = get_real_provider()
     sm = SessionManager(sessions_dir=tmp_sessions_dir)
@@ -77,7 +83,7 @@ async def test_real_llm_calls_ls_tool(tmp_sessions_dir):
 @pytest.mark.asyncio
 async def test_real_llm_calls_find_tool(tmp_sessions_dir):
     """Test that the LLM correctly calls the find tool."""
-    skip_if_no_api_key()
+    skip_if_no_ollama()
     
     provider, model = get_real_provider()
     sm = SessionManager(sessions_dir=tmp_sessions_dir)
@@ -97,7 +103,7 @@ async def test_real_llm_calls_find_tool(tmp_sessions_dir):
 @pytest.mark.asyncio
 async def test_real_llm_calls_read_tool(tmp_sessions_dir):
     """Test that the LLM correctly calls the read tool."""
-    skip_if_no_api_key()
+    skip_if_no_ollama()
     
     provider, model = get_real_provider()
     sm = SessionManager(sessions_dir=tmp_sessions_dir)
@@ -117,7 +123,7 @@ async def test_real_llm_calls_read_tool(tmp_sessions_dir):
 @pytest.mark.asyncio
 async def test_real_llm_uses_multiple_tools(tmp_sessions_dir):
     """Test that the LLM can chain multiple tool calls."""
-    skip_if_no_api_key()
+    skip_if_no_ollama()
     
     provider, model = get_real_provider()
     sm = SessionManager(sessions_dir=tmp_sessions_dir)
@@ -138,7 +144,7 @@ async def test_real_llm_uses_multiple_tools(tmp_sessions_dir):
 @pytest.mark.asyncio
 async def test_real_llm_multiturn_conversation(tmp_sessions_dir):
     """Test multi-turn conversation with context preservation."""
-    skip_if_no_api_key()
+    skip_if_no_ollama()
     
     provider, model = get_real_provider()
     sm = SessionManager(sessions_dir=tmp_sessions_dir)
@@ -163,7 +169,7 @@ async def test_real_llm_multiturn_conversation(tmp_sessions_dir):
 @pytest.mark.asyncio
 async def test_real_llm_list_current_directory(tmp_sessions_dir):
     """Test the exact scenario from the bug report: listing files in current directory."""
-    skip_if_no_api_key()
+    skip_if_no_ollama()
     
     provider, model = get_real_provider()
     sm = SessionManager(sessions_dir=tmp_sessions_dir)
@@ -187,7 +193,7 @@ async def test_real_llm_list_current_directory(tmp_sessions_dir):
 @pytest.mark.asyncio
 async def test_real_llm_bash_tool(tmp_sessions_dir):
     """Test that the bash tool works correctly."""
-    skip_if_no_api_key()
+    skip_if_no_ollama()
     
     provider, model = get_real_provider()
     sm = SessionManager(sessions_dir=tmp_sessions_dir)
@@ -209,7 +215,7 @@ async def test_real_llm_bash_tool(tmp_sessions_dir):
 @pytest.mark.asyncio
 async def test_real_llm_grep_tool(tmp_sessions_dir):
     """Test that the grep tool works correctly."""
-    skip_if_no_api_key()
+    skip_if_no_ollama()
     
     provider, model = get_real_provider()
     sm = SessionManager(sessions_dir=tmp_sessions_dir)

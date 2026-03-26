@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
-from mypi.ai.provider import LLMProvider, TokenEvent, LLMToolCallEvent, DoneEvent, TokenUsage
+from codepi.ai.provider import LLMProvider, TokenEvent, LLMToolCallEvent, DoneEvent, TokenUsage
 
 
 def test_provider_event_types():
@@ -18,7 +18,7 @@ def test_llm_provider_is_abstract():
 
 
 # --- OpenAICompatProvider tests ---
-from mypi.ai.openai_compat import OpenAICompatProvider
+from codepi.ai.openai_compat import OpenAICompatProvider
 
 
 @pytest.mark.asyncio

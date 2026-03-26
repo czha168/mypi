@@ -236,8 +236,8 @@ Centralized management of skills and command generation:
 
 from dataclasses import dataclass
 from pathlib import Path
-from mypi.extensions.skill_loader import Skill
-from mypi.templates.adapters import ToolAdapter, CommandContent
+from codepi.extensions.skill_loader import Skill
+from codepi.templates.adapters import ToolAdapter, CommandContent
 
 
 @dataclass
@@ -326,8 +326,8 @@ New `mypi template` command group:
 
 import argparse
 from pathlib import Path
-from mypi.templates.registry import TemplateRegistry
-from mypi.templates.adapters import ClaudeAdapter, CursorAdapter, WindsurfAdapter
+from codepi.templates.registry import TemplateRegistry
+from codepi.templates.adapters import ClaudeAdapter, CursorAdapter, WindsurfAdapter
 
 
 def add_template_commands(parser: argparse._SubParsersAction) -> None:

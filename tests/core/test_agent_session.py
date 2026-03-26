@@ -1,9 +1,9 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock
-from mypi.core.agent_session import AgentSession
-from mypi.ai.provider import TokenEvent, LLMToolCallEvent, DoneEvent, TokenUsage
-from mypi.core.session_manager import SessionManager
-from mypi.tools.builtins import make_builtin_registry
+from codepi.core.agent_session import AgentSession
+from codepi.ai.provider import TokenEvent, LLMToolCallEvent, DoneEvent, TokenUsage
+from codepi.core.session_manager import SessionManager
+from codepi.tools.builtins import make_builtin_registry
 
 
 def make_mock_provider(events):
@@ -47,7 +47,7 @@ async def test_prompt_executes_tool_calls(tmp_sessions_dir):
             yield TokenEvent(text="Tool result received: ")
             yield DoneEvent(usage=TokenUsage(50, 10))
     
-    from mypi.tools.base import Tool, ToolResult, ToolRegistry
+    from codepi.tools.base import Tool, ToolResult, ToolRegistry
     class EchoTool(Tool):
         name = "echo"
         description = "echo"
