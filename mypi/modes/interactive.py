@@ -1,3 +1,4 @@
+import asyncio
 from __future__ import annotations
 from mypi.core.agent_session import AgentSession
 from mypi.core.session_manager import SessionManager
@@ -48,6 +49,17 @@ class InteractiveMode:
         self._session.on_error = lambda m: self._app.renderer.render_error(m)
 
     async def run(self) -> None:
+        # Check for recovery checkpoint on startup
+        recovery_checkpoint = self._session_manager.get_last_recovery_checkpoint()
+        if recovery_checkpoint:
+            retry_after = recovery_checkpoint.data.get("retry_after", 60)
+            reason = recovery_checkpoint.data.get("reason", "Unknown error")
+            self._app.renderer.render_info(
+                f"Previous session hit rate limit. Will retry in {retry_after}s.\n"
+                f"Reason: {reason}"
+            )
+            await asyncio.sleep(retry_after)
+    
         self._app.renderer.render_info(f"mypi — model: {self._app.model}  Ctrl+C to exit")
         while self._is_running:
             try:
@@ -58,7 +70,11 @@ class InteractiveMode:
                 continue
             self._app.renderer.render_user_message(text)
             self._app.renderer.start_turn()  # Reset buffer for new turn
-            await self._session.prompt(text)
+            try:
+                await self._session.prompt(text)
+            except Exception as e:
+                self._app.renderer.render_error(f"Error: {e}")
+                raise
             self._app.renderer.end_turn()
 
             for queued in self._follow_up_queue:
