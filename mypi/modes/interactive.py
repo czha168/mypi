@@ -1,10 +1,14 @@
 import asyncio
 from __future__ import annotations
+from rich.console import Console
+
 from mypi.core.agent_session import AgentSession
 from mypi.core.session_manager import SessionManager
 from mypi.ai.provider import LLMProvider
 from mypi.tools.base import ToolRegistry
 from mypi.tui.app import TUIApp
+from mypi.tui.rich_renderer import RichRenderer
+from mypi.tui.rich_components import RichInput
 from mypi.extensions.base import Extension
 from mypi.extensions.skill_loader import SkillLoader
 
@@ -22,6 +26,11 @@ class InteractiveMode:
         skill_loader: SkillLoader | None = None,
     ):
         self._session_manager = session_manager
+        self._console = Console()
+        self._renderer = RichRenderer(console=self._console)
+        self._input_handler = RichInput(console=self._console)
+        
+        # Keep TUIApp for compatibility
         self._app = TUIApp(
             model=model,
             session_id=session_id,
@@ -29,8 +38,13 @@ class InteractiveMode:
             on_clear=lambda: None,
             on_checkpoint=lambda: None,
         )
+        # Override renderer with Rich version
+        self._app.renderer = self._renderer
+        
         self._follow_up_queue: list[str] = []
         self._is_running = True
+        self._model = model
+        self._session_id = session_id
 
         kwargs: dict = dict(
             provider=provider,
@@ -43,40 +57,68 @@ class InteractiveMode:
         if system_prompt:
             kwargs["system_prompt"] = system_prompt
         self._session = AgentSession(**kwargs)
-        self._session.on_token = lambda t: self._app.renderer.append_token(t)
-        self._session.on_tool_call = lambda n, a: self._app.renderer.render_tool_call(n, a)
-        self._session.on_tool_result = lambda n, r: self._app.renderer.render_tool_result(n, r.output)
-        self._session.on_error = lambda m: self._app.renderer.render_error(m)
+        
+        # Wire callbacks to Rich renderer
+        self._session.on_token = lambda t: self._renderer.append_token(t)
+        self._session.on_tool_call = lambda n, a: self._renderer.render_tool_call(n, a)
+        self._session.on_tool_result = lambda n, r: self._renderer.render_tool_result(n, r.output)
+        self._session.on_error = lambda m: self._renderer.render_error(m)
 
     async def run(self) -> None:
+        """Run interactive mode with Rich UI."""
+        # Display welcome banner
+        self._renderer.render_welcome(self._model, self._session_id)
+        
         # Check for recovery checkpoint on startup
         recovery_checkpoint = self._session_manager.get_last_recovery_checkpoint()
         if recovery_checkpoint:
             retry_after = recovery_checkpoint.data.get("retry_after", 60)
             reason = recovery_checkpoint.data.get("reason", "Unknown error")
-            self._app.renderer.render_info(
-                f"Previous session hit rate limit. Will retry in {retry_after}s.\n"
-                f"Reason: {reason}"
-            )
-            await asyncio.sleep(retry_after)
-    
-        self._app.renderer.render_info(f"mypi — model: {self._app.model}  Ctrl+C to exit")
+            
+            self._renderer.render_recovery_checkpoint(retry_after, reason)
+            self._renderer.render_info(f"⏳ Waiting {retry_after}s before retrying...")
+            
+            # Show countdown
+            for i in range(retry_after, 0, -1):
+                self._renderer.console.print(f"   Resuming in {i}s...", end="\r")
+                await asyncio.sleep(1)
+            self._renderer.console.print("   Ready!              ")
+        
+        # Main interaction loop
+        self._renderer.render_separator("Interactive Session")
+        
         while self._is_running:
             try:
-                text = await self._app.get_input()
+                # Get user input with rich formatting
+                text = await self._input_handler.get_user_input()
             except (EOFError, KeyboardInterrupt):
+                self._renderer.render_info("Session ended by user")
                 break
+            
             if not text.strip():
                 continue
-            self._app.renderer.render_user_message(text)
-            self._app.renderer.start_turn()  # Reset buffer for new turn
+            
+            # Display user message
+            self._renderer.render_user_message(text)
+            
+            # Start new turn (clear buffer)
+            self._renderer.start_turn()
+            
             try:
+                # Process prompt
                 await self._session.prompt(text)
             except Exception as e:
-                self._app.renderer.render_error(f"Error: {e}")
+                self._renderer.render_error(f"Error: {e}")
                 raise
-            self._app.renderer.end_turn()
-
+            
+            # End turn (display accumulated response)
+            self._renderer.end_turn()
+            
+            self._renderer.render_separator()
+            
+            # Process follow-up queue
             for queued in self._follow_up_queue:
                 await self._session.follow_up(queued)
             self._follow_up_queue.clear()
+        
+        self._renderer.render_info("Goodbye!")
