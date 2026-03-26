@@ -28,7 +28,15 @@ class DoneEvent:
     usage: TokenUsage
 
 
-ProviderEvent = Union[TokenEvent, LLMToolCallEvent, DoneEvent]
+@dataclass
+class RateLimitEvent:
+    """Emitted when rate limit is hit. Contains retry-after time in seconds."""
+    retry_after: int
+    attempt: int
+    max_retries: int
+
+
+ProviderEvent = Union[TokenEvent, LLMToolCallEvent, DoneEvent, RateLimitEvent]
 
 
 class LLMProvider(ABC):
