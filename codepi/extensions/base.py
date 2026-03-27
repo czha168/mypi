@@ -18,6 +18,14 @@ class UIComponents:
     widgets: dict[str, Callable[[], str]] = field(default_factory=dict)
 
 
+@dataclass
+class ModeChangeEvent:
+    """Event fired when operation mode changes."""
+    old_mode: str  # "normal", "plan", "auto"
+    new_mode: str
+    phase: int | None = None  # For plan mode: phase number (1-5)
+
+
 class Extension(ABC):
     name: str
 
@@ -39,6 +47,11 @@ class Extension(ABC):
         pass
 
     async def on_session_tree(self, event: "SessionTreeEvent") -> None:
+        pass
+
+    # Mode change hook
+    async def on_mode_change(self, event: ModeChangeEvent) -> None:
+        """Called when the operation mode changes (normal ↔ plan ↔ auto)."""
         pass
 
     # Registration

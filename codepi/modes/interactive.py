@@ -1,6 +1,8 @@
-import asyncio
 from __future__ import annotations
+import asyncio
+from typing import TYPE_CHECKING
 from rich.console import Console
+from pathlib import Path
 
 from codepi.core.agent_session import AgentSession
 from codepi.core.session_manager import SessionManager
@@ -11,6 +13,11 @@ from codepi.tui.rich_renderer import RichRenderer
 from codepi.tui.rich_components import RichInput
 from codepi.extensions.base import Extension
 from codepi.extensions.skill_loader import SkillLoader
+
+if TYPE_CHECKING:
+    from codepi.core.security import SecurityMonitor
+    from codepi.core.modes.plan_mode import PlanModeManager
+    from codepi.core.modes.auto_mode import AutoModeManager
 
 
 class InteractiveMode:
@@ -24,11 +31,19 @@ class InteractiveMode:
         extensions: list[Extension] | None = None,
         system_prompt: str | None = None,
         skill_loader: SkillLoader | None = None,
+        security_monitor: "SecurityMonitor | None" = None,
+        plan_mode_manager: "PlanModeManager | None" = None,
+        auto_mode_manager: "AutoModeManager | None" = None,
     ):
         self._session_manager = session_manager
         self._console = Console()
         self._renderer = RichRenderer(console=self._console)
         self._input_handler = RichInput(console=self._console)
+        self._security_monitor = security_monitor
+        self._plan_mode_manager = plan_mode_manager
+        self._auto_mode_manager = auto_mode_manager
+        self._current_mode = "normal"
+        self._current_phase = None
         
         # Keep TUIApp for compatibility
         self._app = TUIApp(
@@ -37,6 +52,7 @@ class InteractiveMode:
             on_cancel=lambda: None,
             on_clear=lambda: None,
             on_checkpoint=lambda: None,
+            get_mode_info=self._get_mode_info,
         )
         # Override renderer with Rich version
         self._app.renderer = self._renderer
@@ -53,6 +69,12 @@ class InteractiveMode:
             tool_registry=tool_registry,
             extensions=extensions or [],
             skill_loader=skill_loader,
+            security_monitor=security_monitor,
+            plan_mode_manager=plan_mode_manager,
+            auto_mode_manager=auto_mode_manager,
+            on_mode_change=self._handle_mode_change,
+            on_plan_approval=self._handle_plan_approval,
+            on_auto_approval=self._handle_auto_approval,
         )
         if system_prompt:
             kwargs["system_prompt"] = system_prompt
@@ -63,6 +85,29 @@ class InteractiveMode:
         self._session.on_tool_call = lambda n, a: self._renderer.render_tool_call(n, a)
         self._session.on_tool_result = lambda n, r: self._renderer.render_tool_result(n, r.output)
         self._session.on_error = lambda m: self._renderer.render_error(m)
+
+    def _get_mode_info(self) -> tuple[str, int | None]:
+        return self._current_mode, self._current_phase
+
+    def _handle_mode_change(self, old_mode: str, new_mode: str) -> None:
+        self._current_mode = new_mode
+        if self._plan_mode_manager and self._plan_mode_manager.is_active and self._plan_mode_manager.state:
+            self._current_phase = self._plan_mode_manager.state.phase.value
+        else:
+            self._current_phase = None
+        self._renderer.render_info(f"Mode changed: {old_mode} → {new_mode}")
+
+    def _handle_plan_approval(self, design: str) -> bool:
+        self._renderer.render_info("\n" + "="*60)
+        self._renderer.render_info("PLAN REVIEW - Approve this plan?")
+        self._renderer.render_info("="*60)
+        self._renderer.render_info(design[:2000] + ("..." if len(design) > 2000 else ""))
+        self._renderer.render_info("="*60)
+        return False  # Don't auto-approve
+
+    def _handle_auto_approval(self, reason: str, operation: str) -> bool:
+        self._renderer.render_info(f"Auto mode approval required: {operation} - {reason}")
+        return False  # Don't auto-approve
 
     async def run(self) -> None:
         """Run interactive mode with Rich UI."""

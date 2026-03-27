@@ -72,3 +72,45 @@ class AutoRetryStartEvent:
 @dataclass
 class AutoRetryEndEvent:
     attempt: int
+
+
+# ---------------------------------------------------------------------------
+# Subagent events — for subagent lifecycle
+# ---------------------------------------------------------------------------
+
+@dataclass
+class SubagentStartEvent:
+    """Dispatched when a subagent starts execution."""
+    subagent_name: str
+    config: dict  # SubagentConfig as dict
+    prompt: str
+
+
+@dataclass
+class SubagentEndEvent:
+    """Dispatched when a subagent completes execution."""
+    subagent_name: str
+    status: str  # SubagentStatus value
+    output: str
+    error: str | None = None
+    tokens_used: int = 0
+
+
+# ---------------------------------------------------------------------------
+# Mode events — for mode switching
+# ---------------------------------------------------------------------------
+
+@dataclass
+class ModeChangeEvent:
+    """Dispatched when operation mode changes."""
+    from_mode: str  # "normal", "plan", "auto"
+    to_mode: str
+    phase: int | None = None  # For plan mode: current phase (1-5)
+
+
+@dataclass
+class PlanModePhaseEvent:
+    """Dispatched when plan mode advances to a new phase."""
+    phase: int  # 1-5: UNDERSTAND, DESIGN, REVIEW, FINALIZE, EXIT
+    phase_name: str
+    plan_file: str | None = None

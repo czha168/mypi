@@ -3,6 +3,8 @@ import asyncio
 import json
 import logging
 from collections.abc import Callable
+from typing import TYPE_CHECKING
+
 from codepi.ai.provider import LLMProvider, TokenEvent, LLMToolCallEvent, DoneEvent
 from codepi.core.events import (
     BeforeAgentStartEvent, BeforeProviderRequestEvent,
@@ -12,6 +14,11 @@ from codepi.core.session_manager import SessionManager, SessionEntry
 from codepi.extensions.base import Extension
 from codepi.extensions.skill_loader import SkillLoader
 from codepi.tools.base import ToolRegistry, ToolResult, filter_tool_arguments
+
+if TYPE_CHECKING:
+    from codepi.core.security import SecurityMonitor
+    from codepi.core.modes.plan_mode import PlanModeManager, PlanModeConfig
+    from codepi.core.modes.auto_mode import AutoModeManager, AutoModeConfig
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +38,13 @@ class AgentSession:
         max_retries: int = 3,
         context_window: int = 128_000,
         skill_loader: SkillLoader | None = None,
+        security_monitor: "SecurityMonitor | None" = None,
+        on_security_ask: Callable[[str, str], bool] | None = None,
+        plan_mode_manager: "PlanModeManager | None" = None,
+        auto_mode_manager: "AutoModeManager | None" = None,
+        on_mode_change: Callable[[str, str], None] | None = None,
+        on_plan_approval: Callable[[str], bool] | None = None,
+        on_auto_approval: Callable[[str, str], bool] | None = None,
     ):
         self.provider = provider
         self.session_manager = session_manager
@@ -42,10 +56,19 @@ class AgentSession:
         self.max_retries = max_retries
         self._context_window = context_window
         self._skill_loader = skill_loader
+        self._security_monitor = security_monitor
+        self._on_security_ask = on_security_ask
         self._last_input_tokens: int = 0
         self._is_idle = True
         self._in_flight_tool: str | None = None
         self._steer_override: str | None = None
+
+        # Mode managers
+        self._plan_mode_manager = plan_mode_manager
+        self._auto_mode_manager = auto_mode_manager
+        self._on_mode_change = on_mode_change
+        self._on_plan_approval = on_plan_approval
+        self._on_auto_approval = on_auto_approval
 
         # Callbacks for callers (modes)
         self.on_token: Callable[[str], None] | None = None
@@ -56,6 +79,92 @@ class AgentSession:
     @property
     def is_idle(self) -> bool:
         return self._is_idle
+
+    @property
+    def current_mode(self) -> str:
+        if self._plan_mode_manager and self._plan_mode_manager.is_active:
+            return "plan"
+        if self._auto_mode_manager and self._auto_mode_manager.is_active:
+            return "auto"
+        return "normal"
+
+    @property
+    def plan_phase(self) -> int | None:
+        if self._plan_mode_manager and self._plan_mode_manager.is_active and self._plan_mode_manager.state:
+            return self._plan_mode_manager.state.phase.value
+        return None
+
+    def start_plan_mode(self, user_request: str, plan_file: str | None = None) -> None:
+        from codepi.core.modes.plan_mode import PlanModeManager
+        if not self._plan_mode_manager:
+            self._plan_mode_manager = PlanModeManager(
+                on_phase_change=self._handle_phase_change,
+                on_approval_required=self._handle_plan_approval,
+            )
+        from pathlib import Path
+        self._plan_mode_manager.start(
+            user_request,
+            Path(plan_file) if plan_file else None,
+        )
+        if self._on_mode_change:
+            self._on_mode_change("normal", "plan")
+
+    def stop_plan_mode(self) -> None:
+        if self._plan_mode_manager:
+            self._plan_mode_manager.stop()
+            if self._on_mode_change:
+                self._on_mode_change("plan", "normal")
+
+    def start_auto_mode(self) -> None:
+        from codepi.core.modes.auto_mode import AutoModeManager, AutoModeConfig
+        if not self._auto_mode_manager:
+            self._auto_mode_manager = AutoModeManager(
+                on_iteration_limit=self._handle_iteration_limit,
+                on_approval_needed=self._handle_auto_approval,
+            )
+        self._auto_mode_manager.start()
+        if self._on_mode_change:
+            self._on_mode_change("normal", "auto")
+
+    def stop_auto_mode(self) -> None:
+        if self._auto_mode_manager:
+            self._auto_mode_manager.stop()
+            if self._on_mode_change:
+                self._on_mode_change("auto", "normal")
+
+    def _handle_phase_change(self, old_phase, new_phase) -> None:
+        pass
+
+    def _handle_plan_approval(self, design: str) -> bool:
+        if self._on_plan_approval:
+            return self._on_plan_approval(design)
+        return False
+
+    def _handle_iteration_limit(self, count: int) -> bool:
+        return False
+
+    def _handle_auto_approval(self, reason: str, operation: str) -> bool:
+        if self._on_auto_approval:
+            return self._on_auto_approval(reason, operation)
+        return False
+
+    def _is_edit_blocked_by_plan_mode(self, tool_name: str, arguments: dict) -> tuple[bool, str]:
+        if not self._plan_mode_manager or not self._plan_mode_manager.is_active:
+            return False, ""
+
+        if tool_name not in ("write", "edit"):
+            return False, ""
+
+        state = self._plan_mode_manager.state
+        if state is None:
+            return False, ""
+
+        file_path = arguments.get("file_path") or arguments.get("path")
+
+        if state.is_edit_allowed(file_path):
+            return False, ""
+
+        return True, f"Plan mode active (phase {state.phase.name}) - edits not allowed"
 
     def _is_opsx_command(self, text: str) -> bool:
         stripped = text.strip()
@@ -200,12 +309,65 @@ class AgentSession:
                     self._in_flight_tool = call_evt.tool_name
                     self._steer_override = None
 
+                    tool_result = None
                     tool = self.tool_registry.get(call_evt.tool_name)
-                    if tool:
-                        filtered_args = filter_tool_arguments(tool, call_evt.arguments)
-                        tool_result = await tool.execute(**filtered_args)
-                    else:
-                        tool_result = ToolResult(error=f"Unknown tool: {call_evt.tool_name}")
+                    
+                    # Check plan mode edit blocking
+                    if tool_result is None:
+                        blocked, reason = self._is_edit_blocked_by_plan_mode(
+                            call_evt.tool_name, call_evt.arguments
+                        )
+                        if blocked:
+                            tool_result = ToolResult(error=reason)
+                    
+                    # Check auto mode iteration limit
+                    if tool_result is None and self._auto_mode_manager and self._auto_mode_manager.is_active:
+                        can_continue, msg = self._auto_mode_manager.check_iteration_limit()
+                        if not can_continue:
+                            tool_result = ToolResult(error=f"Auto mode paused: {msg}")
+                    
+                    # Check auto mode approval gates
+                    if tool_result is None and self._auto_mode_manager and self._auto_mode_manager.is_active:
+                        from codepi.core.modes.auto_mode import get_sensitive_operation_from_command
+                        operation = get_sensitive_operation_from_command(
+                            call_evt.arguments.get("command", "")
+                        ) if call_evt.tool_name == "bash" else None
+                        approved, reason = self._auto_mode_manager.check_and_request_approval(
+                            operation or call_evt.tool_name,
+                            call_evt.tool_name,
+                            call_evt.arguments,
+                        )
+                        if not approved:
+                            tool_result = ToolResult(error=f"Auto mode approval required: {reason}")
+                    
+                    # Check security monitor
+                    if self._security_monitor:
+                        from codepi.core.security import SecurityAction
+                        decision = self._security_monitor.evaluate_tool_call(
+                            call_evt.tool_name,
+                            call_evt.arguments,
+                        )
+                        
+                        if decision.action == SecurityAction.BLOCK:
+                            tool_result = ToolResult(error=f"Security: {decision.reason}")
+                        elif decision.action == SecurityAction.ASK:
+                            if self._on_security_ask:
+                                approved = self._on_security_ask(decision.reason, decision.rule_id)
+                                if not approved:
+                                    tool_result = ToolResult(
+                                        error=f"Security: Operation rejected by user - {decision.reason}"
+                                    )
+                            else:
+                                tool_result = ToolResult(
+                                    error=f"Security: {decision.reason} (requires approval)"
+                                )
+                    
+                    if tool_result is None:
+                        if tool:
+                            filtered_args = filter_tool_arguments(tool, call_evt.arguments)
+                            tool_result = await tool.execute(**filtered_args)
+                        else:
+                            tool_result = ToolResult(error=f"Unknown tool: {call_evt.tool_name}")
 
                     if self._steer_override is not None:
                         tool_result = ToolResult(output=self._steer_override)

@@ -41,3 +41,72 @@ Extensions can also register custom tools, keyboard shortcuts, and UI components
 
 ### Session Storage
 Sessions are stored as JSONL files with a tree structure (each entry has `id` + `parentId`). Branching creates new tree nodes in the same file, not new files. Context reconstruction traverses from leaf to root, skipping compacted entries while keeping their summaries.
+
+## Prompt Architecture
+
+codepi uses a modular prompt system inspired by Claude Code:
+
+```
+codepi/prompts/
+├── __init__.py          # PromptComposer
+├── composer.py          # Template rendering
+├── components/
+│   ├── persona.py       # Base identity
+│   ├── tools.py         # Tool usage rules
+│   ├── constraints.py   # Read-only, safety
+│   ├── modes.py         # Plan/auto mode prompts
+│   └── efficiency.py    # Output guidelines
+└── templates/
+    ├── base.yaml        # Default template
+    ├── explore.yaml     # Explore subagent
+    ├── plan.yaml        # Plan subagent
+    └── auto.yaml        # Auto mode
+```
+
+### Components
+Components are mixed and matched based on context. Each returns a string fragment that gets composed into the system prompt.
+
+### Templates
+YAML templates support variable interpolation with `{{variable}}` syntax. Templates are loaded on-demand and cached.
+
+## Operation Modes
+
+| Mode | Entry | Key Behavior |
+|------|-------|--------------|
+| Normal | Default | Standard interactive |
+| Plan | `--plan` or `Ctrl+P` | 5-phase workflow, edit blocking |
+| Auto | `--auto` or `Ctrl+A` | Continuous execution, approval gates |
+
+### Plan Mode Phases
+1. UNDERSTAND — Read-only exploration
+2. DESIGN — Create plan (still read-only)
+3. REVIEW — Wait for user approval
+4. FINALIZE — Write plan file
+5. EXIT — Return to normal
+
+### Auto Mode
+- Iteration limit enforced (default: 100)
+- Approval required for: push, PR, publish
+- Can be paused on errors
+
+## Security Monitor
+
+Rule-based classifier with three actions:
+- **ALLOW** — Operation proceeds
+- **BLOCK** — Operation rejected with reason
+- **ASK** — User confirmation required
+
+Rule categories:
+- Destructive (rm -rf, DROP TABLE)
+- Hard-to-reverse (force push, hard reset)
+- Shared state (push, PR)
+- Credential exposure (.env, API keys)
+
+## Extension Hooks
+
+Extensions can hook into agent lifecycle:
+- `on_before_agent_start` — Modify system prompt
+- `on_before_provider_request` — Modify LLM params
+- `on_tool_call` / `on_tool_result` — Intercept tools
+- `on_mode_change` — Mode transitions (NEW)
+- `on_session_fork` / `on_session_tree` — Session branching

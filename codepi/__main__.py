@@ -10,6 +10,7 @@ from codepi.extensions.loader import ExtensionLoader
 from codepi.extensions.skill_loader import SkillLoader
 from codepi.core.events import BeforeAgentStartEvent
 from codepi.extensions.base import Extension
+from codepi.core.security import SecurityMonitor
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -21,6 +22,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--skills-dir", metavar="DIR", action="append", dest="skills_dirs", help="Additional skills directory")
     p.add_argument("--base-url", metavar="URL", help="Override OpenAI-compatible base URL")
     p.add_argument("--config", metavar="PATH", help="Path to config.toml")
+    p.add_argument("--plan", action="store_true", help="Start in plan mode (structured planning workflow)")
+    p.add_argument("--auto", action="store_true", help="Start in auto mode (continuous autonomous execution)")
     sub = p.add_subparsers(dest="cmd", metavar="COMMAND", help="Available commands")
     from codepi.templates.cli import add_template_parser
     add_template_parser(sub)
@@ -107,6 +110,34 @@ async def _run(args: argparse.Namespace) -> None:
     model = config.provider.model
     session_id = getattr(sm, '_session_id', None) or "unknown"
 
+    # Initialize security monitor
+    security_monitor = SecurityMonitor(config=config.security) if config.security.enabled else None
+
+    # Initialize mode managers based on flags and config
+    from codepi.core.modes.plan_mode import PlanModeManager, PlanModeConfig
+    from codepi.core.modes.auto_mode import AutoModeManager, AutoModeConfig
+
+    plan_mode_manager = None
+    auto_mode_manager = None
+
+    # Auto mode takes precedence if both are specified
+    if args.auto or config.modes.auto.enabled:
+        auto_config = AutoModeConfig(
+            enabled=True,
+            max_iterations=config.modes.auto.max_iterations,
+            require_approval_for=config.modes.auto.require_approval_for,
+            pause_on_errors=config.modes.auto.pause_on_errors,
+        )
+        auto_mode_manager = AutoModeManager(config=auto_config)
+    elif args.plan or config.modes.plan.enabled:
+        plan_config = PlanModeConfig(
+            enabled=True,
+            auto_advance=config.modes.plan.auto_advance,
+            require_explicit_approval=config.modes.plan.require_explicit_approval,
+            max_iterations=config.modes.plan.max_iterations,
+        )
+        plan_mode_manager = PlanModeManager(config=plan_config)
+
     if args.print_prompt:
         from codepi.modes.print_mode import PrintMode
         mode = PrintMode(provider=provider, session_manager=sm, model=model,
@@ -128,6 +159,9 @@ async def _run(args: argparse.Namespace) -> None:
             session_id=session_id,
             tool_registry=registry, extensions=all_extensions,
             skill_loader=skill_loader,
+            security_monitor=security_monitor,
+            plan_mode_manager=plan_mode_manager,
+            auto_mode_manager=auto_mode_manager,
         )
         await mode.run()
 

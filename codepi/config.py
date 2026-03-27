@@ -24,6 +24,23 @@ extensions_dir = "~/.mypi/extensions"
 [lsp]
 server = ""  # "pyright", "pylsp", "jedi-language-server", or empty for auto-detect
 enabled = true
+
+[security]
+enabled = true
+# rule_overrides = { "shared:push" = "allow" }
+
+[modes.plan]
+enabled = false
+auto_advance = false
+require_explicit_approval = true
+max_iterations = 5
+
+[modes.auto]
+enabled = false
+max_iterations = 100
+require_approval_for = ["push", "pr", "publish"]
+pause_on_errors = true
+auto_run_tests = true
 """
 
 
@@ -54,11 +71,45 @@ class LSPConfig:
 
 
 @dataclass
+class SecurityConfig:
+    enabled: bool = True
+    rule_overrides: dict[str, str] = field(default_factory=dict)
+
+
+@dataclass
+class PlanModeConfigData:
+    """Configuration for plan mode."""
+    enabled: bool = False
+    auto_advance: bool = False
+    require_explicit_approval: bool = True
+    max_iterations: int = 5
+
+
+@dataclass
+class AutoModeConfigData:
+    """Configuration for auto mode."""
+    enabled: bool = False
+    max_iterations: int = 100
+    require_approval_for: list[str] = field(default_factory=lambda: ["push", "pr", "publish"])
+    pause_on_errors: bool = True
+    auto_run_tests: bool = True
+
+
+@dataclass
+class ModesConfig:
+    """Configuration for operation modes."""
+    plan: PlanModeConfigData = field(default_factory=PlanModeConfigData)
+    auto: AutoModeConfigData = field(default_factory=AutoModeConfigData)
+
+
+@dataclass
 class Config:
     provider: ProviderConfig = field(default_factory=ProviderConfig)
     session: SessionConfig = field(default_factory=SessionConfig)
     paths: PathsConfig = field(default_factory=PathsConfig)
     lsp: LSPConfig = field(default_factory=LSPConfig)
+    security: SecurityConfig = field(default_factory=SecurityConfig)
+    modes: ModesConfig = field(default_factory=ModesConfig)
 
 
 def load_config(config_path: Path | None = None) -> Config:
@@ -72,6 +123,10 @@ def load_config(config_path: Path | None = None) -> Config:
     s = raw.get("session", {})
     paths = raw.get("paths", {})
     l = raw.get("lsp", {})
+    sec = raw.get("security", {})
+    modes_raw = raw.get("modes", {})
+    plan_raw = modes_raw.get("plan", {})
+    auto_raw = modes_raw.get("auto", {})
 
     # Environment variables override config file
     api_key = os.environ.get("OPENAI_API_KEY") or p.get("api_key", "")
@@ -95,5 +150,24 @@ def load_config(config_path: Path | None = None) -> Config:
         lsp=LSPConfig(
             server=l.get("server", ""),
             enabled=l.get("enabled", True),
+        ),
+        security=SecurityConfig(
+            enabled=sec.get("enabled", True),
+            rule_overrides=sec.get("rule_overrides", {}),
+        ),
+        modes=ModesConfig(
+            plan=PlanModeConfigData(
+                enabled=plan_raw.get("enabled", False),
+                auto_advance=plan_raw.get("auto_advance", False),
+                require_explicit_approval=plan_raw.get("require_explicit_approval", True),
+                max_iterations=plan_raw.get("max_iterations", 5),
+            ),
+            auto=AutoModeConfigData(
+                enabled=auto_raw.get("enabled", False),
+                max_iterations=auto_raw.get("max_iterations", 100),
+                require_approval_for=auto_raw.get("require_approval_for", ["push", "pr", "publish"]),
+                pause_on_errors=auto_raw.get("pause_on_errors", True),
+                auto_run_tests=auto_raw.get("auto_run_tests", True),
+            ),
         ),
     )

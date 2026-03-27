@@ -264,6 +264,69 @@ codepi --session 550e8400-e29b-41d4-a716-446655440000
 
 **Branching** allows exploring alternative approaches. The session tree preserves history for each branch.
 
+## Plan Mode
+
+Structured 5-phase planning workflow for complex tasks:
+
+```bash
+codepi --plan
+```
+
+Phases:
+1. **UNDERSTAND** — Explore codebase, ask clarifying questions
+2. **DESIGN** — Create implementation plan
+3. **REVIEW** — User reviews and approves
+4. **FINALIZE** — Write plan to `.codepi/plans/`
+5. **EXIT** — Return to normal mode
+
+During planning, file edits are blocked. Only the plan file can be written in FINALIZE phase.
+
+Keyboard: `Ctrl+P` toggles plan mode during session.
+
+## Auto Mode
+
+Continuous autonomous execution for routine tasks:
+
+```bash
+codepi --auto
+```
+
+Features:
+- **Iteration limit**: Pauses after N turns (default: 100)
+- **Approval gates**: Prompts before push, PR, publish operations
+- **Safety rules**: Still enforces security restrictions
+
+Keyboard: `Ctrl+A` toggles auto mode during session.
+
+### Auto Mode Config
+
+```toml
+[modes.auto]
+enabled = false
+max_iterations = 100
+require_approval_for = ["push", "pr", "publish"]
+pause_on_errors = true
+```
+
+## Security Monitor
+
+Built-in security rules protect against dangerous operations:
+
+| Category | Examples | Action |
+|----------|----------|--------|
+| Destructive | `rm -rf`, `DROP TABLE` | BLOCK |
+| Hard-to-reverse | `git push --force`, `git reset --hard` | BLOCK |
+| Shared state | `git push`, `gh pr create` | ASK |
+| Credentials | `.env` files, API keys in code | ASK |
+
+Configure in `config.toml`:
+
+```toml
+[security]
+enabled = true
+# rule_overrides = { "shared:push" = "allow" }
+```
+
 ## Development
 
 ```bash
