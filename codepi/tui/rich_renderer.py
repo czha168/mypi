@@ -69,6 +69,8 @@ class RichRenderer:
     def end_turn(self) -> None:
         """Render complete assistant message and clear buffer."""
         if self._buffer.strip():
+            # Ensure Panel starts on a new line after streaming output
+            self.console.print()
             panel = Panel(
                 Markdown(self._buffer),
                 title=Text("Assistant", style="bold green"),
