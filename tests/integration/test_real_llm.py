@@ -15,16 +15,31 @@ def get_real_provider():
     return OpenAICompatProvider(base_url=base_url, api_key=api_key, default_model=model), model
 
 
-def skip_if_no_ollama():
-    """Skip test if Ollama server is not running."""
+def skip_if_no_provider():
+    """Skip test if no LLM provider is reachable.
+
+    For local Ollama endpoints (localhost), checks /api/tags.
+    For remote endpoints, does a lightweight models list probe.
+    """
     base_url = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434/v1")
+    is_local = "localhost" in base_url or "127.0.0.1" in base_url
+
     try:
         with httpx.Client() as client:
-            resp = client.get(base_url.replace("/v1", "/api/tags"), timeout=2.0)
-            if resp.status_code != 200:
-                pytest.skip(f"Ollama server not responding at {base_url}")
+            if is_local:
+                resp = client.get(base_url.replace("/v1", "/api/tags"), timeout=2.0)
+            else:
+                # Remote provider: just verify it responds
+                api_key = os.environ.get("OLLAMA_API_KEY", "ollama")
+                resp = client.get(
+                    base_url.rstrip("/") + "/models",
+                    headers={"Authorization": f"Bearer {api_key}"},
+                    timeout=10.0,
+                )
+            if resp.status_code not in (200, 401, 403):
+                pytest.skip(f"Provider not responding at {base_url} (status {resp.status_code})")
     except Exception as e:
-        pytest.skip(f"Ollama server not available: {e}")
+        pytest.skip(f"Provider not available: {e}")
 
 
 @pytest.fixture
@@ -46,7 +61,7 @@ def real_session(tmp_sessions_dir, real_provider):
 @pytest.mark.asyncio
 async def test_real_llm_simple_response(real_session):
     """Test that the LLM can respond to a simple prompt."""
-    skip_if_no_ollama()
+    skip_if_no_provider()
     
     tokens = []
     real_session.on_token = lambda t: tokens.append(t)
@@ -60,7 +75,7 @@ async def test_real_llm_simple_response(real_session):
 @pytest.mark.asyncio
 async def test_real_llm_calls_ls_tool(tmp_sessions_dir):
     """Test that the LLM correctly calls the ls tool to list files."""
-    skip_if_no_ollama()
+    skip_if_no_provider()
     
     provider, model = get_real_provider()
     sm = SessionManager(sessions_dir=tmp_sessions_dir)
@@ -83,7 +98,7 @@ async def test_real_llm_calls_ls_tool(tmp_sessions_dir):
 @pytest.mark.asyncio
 async def test_real_llm_calls_find_tool(tmp_sessions_dir):
     """Test that the LLM correctly calls the find tool."""
-    skip_if_no_ollama()
+    skip_if_no_provider()
     
     provider, model = get_real_provider()
     sm = SessionManager(sessions_dir=tmp_sessions_dir)
@@ -103,7 +118,7 @@ async def test_real_llm_calls_find_tool(tmp_sessions_dir):
 @pytest.mark.asyncio
 async def test_real_llm_calls_read_tool(tmp_sessions_dir):
     """Test that the LLM correctly calls the read tool."""
-    skip_if_no_ollama()
+    skip_if_no_provider()
     
     provider, model = get_real_provider()
     sm = SessionManager(sessions_dir=tmp_sessions_dir)
@@ -123,7 +138,7 @@ async def test_real_llm_calls_read_tool(tmp_sessions_dir):
 @pytest.mark.asyncio
 async def test_real_llm_uses_multiple_tools(tmp_sessions_dir):
     """Test that the LLM can chain multiple tool calls."""
-    skip_if_no_ollama()
+    skip_if_no_provider()
     
     provider, model = get_real_provider()
     sm = SessionManager(sessions_dir=tmp_sessions_dir)
@@ -144,7 +159,7 @@ async def test_real_llm_uses_multiple_tools(tmp_sessions_dir):
 @pytest.mark.asyncio
 async def test_real_llm_multiturn_conversation(tmp_sessions_dir):
     """Test multi-turn conversation with context preservation."""
-    skip_if_no_ollama()
+    skip_if_no_provider()
     
     provider, model = get_real_provider()
     sm = SessionManager(sessions_dir=tmp_sessions_dir)
@@ -169,7 +184,7 @@ async def test_real_llm_multiturn_conversation(tmp_sessions_dir):
 @pytest.mark.asyncio
 async def test_real_llm_list_current_directory(tmp_sessions_dir):
     """Test the exact scenario from the bug report: listing files in current directory."""
-    skip_if_no_ollama()
+    skip_if_no_provider()
     
     provider, model = get_real_provider()
     sm = SessionManager(sessions_dir=tmp_sessions_dir)
@@ -193,7 +208,7 @@ async def test_real_llm_list_current_directory(tmp_sessions_dir):
 @pytest.mark.asyncio
 async def test_real_llm_bash_tool(tmp_sessions_dir):
     """Test that the bash tool works correctly."""
-    skip_if_no_ollama()
+    skip_if_no_provider()
     
     provider, model = get_real_provider()
     sm = SessionManager(sessions_dir=tmp_sessions_dir)
@@ -215,7 +230,7 @@ async def test_real_llm_bash_tool(tmp_sessions_dir):
 @pytest.mark.asyncio
 async def test_real_llm_grep_tool(tmp_sessions_dir):
     """Test that the grep tool works correctly."""
-    skip_if_no_ollama()
+    skip_if_no_provider()
     
     provider, model = get_real_provider()
     sm = SessionManager(sessions_dir=tmp_sessions_dir)

@@ -32,6 +32,13 @@ def build_parser() -> argparse.ArgumentParser:
 
 async def _run(args: argparse.Namespace) -> None:
     config = load_config(Path(args.config) if args.config else None)
+    # Automatic attribution hook
+    try:
+        from codepi.addons import attribution
+        attribution.on_startup()
+    except Exception as e:
+        # If attribution fails we simply warn but continue
+        print(f"Warning: Attribution init failed: {e}")
 
     # CLI overrides
     if args.model:
