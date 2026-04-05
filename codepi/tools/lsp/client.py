@@ -12,7 +12,7 @@ NO_SERVER_ERROR = """No Python LSP server found. Install one of:
   - pylsp:        pip install python-lsp-server
   - jedi-language-server: pip install jedi-language-server
 
-Then restart mypi."""
+Then restart codepi."""
 
 
 class LSPClientManager:

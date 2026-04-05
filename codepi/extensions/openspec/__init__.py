@@ -1,1 +1,1 @@
-"""Package marker for mypi.extensions.openspec."""
+"""Package marker for codepi.extensions.openspec."""

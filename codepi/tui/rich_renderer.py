@@ -26,7 +26,7 @@ class RichRenderer:
     
     def render_welcome(self, model: str, session_id: str) -> None:
         """Display welcome banner with session info."""
-        title_text = Text("mypi", style="bold cyan")
+        title_text = Text("codepi", style="bold cyan")
         title_text.append(" — AI Coding Agent", style="white")
         
         info = Table.grid(padding=(0, 2))

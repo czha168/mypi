@@ -52,7 +52,7 @@ class ExtensionLoader:
             self._observer.join()
 
     def _load_file(self, path: Path) -> None:
-        module_name = f"mypi_ext_{path.stem}"
+        module_name = f"codepi_ext_{path.stem}"
         spec = importlib.util.spec_from_file_location(module_name, path)
         if spec is None or spec.loader is None:
             return

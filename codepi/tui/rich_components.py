@@ -1,4 +1,4 @@
-"""Reusable Rich UI components for mypi terminal interface."""
+"""Reusable Rich UI components for codepi terminal interface."""
 
 from rich.console import Console
 from rich.table import Table

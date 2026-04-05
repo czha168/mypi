@@ -4,7 +4,7 @@ import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
 
-DEFAULT_CONFIG_PATH = Path.home() / ".mypi" / "config.toml"
+DEFAULT_CONFIG_PATH = Path.home() / ".codepi" / "config.toml"
 
 DEFAULT_CONFIG = """
 [provider]
@@ -17,9 +17,9 @@ compaction_threshold = 0.80
 max_retries = 3
 
 [paths]
-sessions_dir  = "~/.mypi/sessions"
-skills_dir    = "~/.mypi/skills"
-extensions_dir = "~/.mypi/extensions"
+sessions_dir  = "~/.codepi/sessions"
+skills_dir    = "~/.codepi/skills"
+extensions_dir = "~/.codepi/extensions"
 
 [lsp]
 server = ""  # "pyright", "pylsp", "jedi-language-server", or empty for auto-detect
@@ -59,9 +59,9 @@ class SessionConfig:
 
 @dataclass
 class PathsConfig:
-    sessions_dir: Path = field(default_factory=lambda: Path.home() / ".mypi" / "sessions")
-    skills_dir: Path = field(default_factory=lambda: Path.home() / ".mypi" / "skills")
-    extensions_dir: Path = field(default_factory=lambda: Path.home() / ".mypi" / "extensions")
+    sessions_dir: Path = field(default_factory=lambda: Path.home() / ".codepi" / "sessions")
+    skills_dir: Path = field(default_factory=lambda: Path.home() / ".codepi" / "skills")
+    extensions_dir: Path = field(default_factory=lambda: Path.home() / ".codepi" / "extensions")
 
 
 @dataclass
@@ -143,9 +143,9 @@ def load_config(config_path: Path | None = None) -> Config:
             max_retries=s.get("max_retries", 3),
         ),
         paths=PathsConfig(
-            sessions_dir=Path(paths.get("sessions_dir", "~/.mypi/sessions")).expanduser(),
-            skills_dir=Path(paths.get("skills_dir", "~/.mypi/skills")).expanduser(),
-            extensions_dir=Path(paths.get("extensions_dir", "~/.mypi/extensions")).expanduser(),
+            sessions_dir=Path(paths.get("sessions_dir", "~/.codepi/sessions")).expanduser(),
+            skills_dir=Path(paths.get("skills_dir", "~/.codepi/skills")).expanduser(),
+            extensions_dir=Path(paths.get("extensions_dir", "~/.codepi/extensions")).expanduser(),
         ),
         lsp=LSPConfig(
             server=l.get("server", ""),
