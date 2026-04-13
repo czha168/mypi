@@ -121,7 +121,7 @@ class RichRenderer:
         """Display error message with red styling."""
         panel = Panel(
             Text(message, style="bold red"),
-            title=Text("❌ Error", style="bold red"),
+            title=Text("✕ Error", style="bold red"),
             border_style="red",
             expand=True,
             padding=(0, 1),
@@ -132,7 +132,7 @@ class RichRenderer:
         """Display informational message."""
         panel = Panel(
             Text(message, style="white"),
-            title=Text("ℹ️  Info", style="bold cyan"),
+            title=Text("ℹ Info", style="bold cyan"),
             border_style="cyan",
             expand=True,
             padding=(0, 1),
@@ -143,7 +143,7 @@ class RichRenderer:
         """Display warning message."""
         panel = Panel(
             Text(message, style="bold yellow"),
-            title=Text("⚠️  Warning", style="bold yellow"),
+            title=Text("⚠ Warning", style="bold yellow"),
             border_style="yellow",
             expand=True,
             padding=(0, 1),
@@ -174,7 +174,7 @@ class RichRenderer:
         
         panel = Panel(
             info,
-            title=Text("🔄 Rate Limit", style="bold yellow"),
+            title=Text("⟳ Rate Limit", style="bold yellow"),
             border_style="yellow",
             expand=True,
             padding=(1, 2),
@@ -190,7 +190,7 @@ class RichRenderer:
         
         panel = Panel(
             info,
-            title=Text("♻️  Recovering", style="bold yellow"),
+            title=Text("♻ Recovering", style="bold yellow"),
             border_style="yellow",
             expand=True,
             padding=(1, 2),
