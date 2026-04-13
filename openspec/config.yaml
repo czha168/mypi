@@ -9,6 +9,11 @@ schema: spec-driven
 #     We use conventional commits
 #     Domain: e-commerce platform
 
+context: |
+    Use virtual environment `venv` for all testing
+    Use Ollama model `gpt-oss:20b-128k` for end-to-end testing when live LLM is needed
+    Use `python3` and `pip3`
+
 # Per-artifact rules (optional)
 # Add custom rules for specific artifacts.
 # Example:

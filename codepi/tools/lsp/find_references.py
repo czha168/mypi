@@ -50,7 +50,7 @@ class LSPFindReferencesTool(LSPTool):
 
             client = await self._get_client(workspace)
 
-            refs = await client.request_references(
+            refs = await client.request_references(  # type: ignore[attr-defined]
                 file_path=str(path),
                 position=Position(line=line - 1, character=character),
             )

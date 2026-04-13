@@ -1,4 +1,4 @@
-# mypi
+# codepi
 
 A minimalist terminal-based coding assistant written in Python. Give it a task, it uses file system and shell tools to read, edit, and execute code on your behalf.
 
@@ -33,7 +33,7 @@ codepi
 
 ### Installing an LSP Server (Recommended)
 
-For LSP tools to work, you need a Python language server installed. mypi will auto-detect any of these servers:
+For LSP tools to work, you need a Python language server installed. codepi will auto-detect any of these servers:
 
 | Server | Installation | Notes |
 |--------|--------------|-------|
@@ -52,7 +52,7 @@ If no server is found, LSP tools will return a helpful error message with instal
 
 ## Configuration
 
-Create `~/.mypi/config.toml`:
+Create `~/.codepi/config.toml`:
 
 ```toml
 [provider]
@@ -67,6 +67,16 @@ max_retries = 3
 [lsp]
 server = ""      # "pyright", "pylsp", "jedi-language-server", or empty for auto-detect
 enabled = true   # Set to false to disable LSP tools
+
+[security]
+enabled = true
+
+[memory]
+enabled = true
+max_items = 500
+injection_token_budget = 1000
+hotness_half_life_days = 7
+dedup_jaccard_threshold = 0.7
 ```
 
 **Environment variables** (override config):
@@ -129,7 +139,7 @@ from codepi.core.session_manager import SessionManager
 from codepi.tools.builtins import make_builtin_registry
 
 provider = OpenAICompatProvider(base_url="...", api_key="...")
-sm = SessionManager("~/.mypi/sessions")
+sm = SessionManager("~/.codepi/sessions")
 sm.new_session(model="gpt-4o")
 
 sdk = SDK(provider=provider, session_manager=sm, model="gpt-4o", 
@@ -213,7 +223,7 @@ codepi includes 5 LSP-powered tools for semantic Python code intelligence. These
 
 ## Extensions
 
-Drop `.py` files into `~/.mypi/extensions/`:
+Drop `.py` files into `~/.codepi/extensions/`:
 
 ```python
 from codepi.extensions.base import Extension
@@ -250,19 +260,50 @@ When writing commits:
 2. Explain *why*, not *what*
 ```
 
-Place in `~/.mypi/skills/` or add directories with `--skills-dir`.
+Place in `~/.codepi/skills/` or add directories with `--skills-dir`.
 
 ## Session Management
 
-Sessions are stored as JSONL files in `~/.mypi/sessions/`. Resume with:
+Sessions are stored as JSONL files in `~/.codepi/sessions/`. Resume with:
 
 ```bash
 codepi --session 550e8400-e29b-41d4-a716-446655440000
 ```
 
-**Auto-compaction** triggers at 80% context window usage — the model summarizes conversation history to free up tokens.
+**Auto-compaction** triggers at 80% context window usage — the model summarizes conversation history to free up tokens. Compaction produces two tiers: a short keyword abstract (L0) and a structured overview (L1), enabling context-aware reconstruction based on available token budget.
 
 **Branching** allows exploring alternative approaches. The session tree preserves history for each branch.
+
+## Cross-Session Memory
+
+codepi automatically extracts reusable knowledge from conversations and persists it across sessions. After each auto-compaction, a memory extraction pipeline:
+
+1. **Extracts** knowledge items from the compacted conversation (decisions, patterns, file-knowledge, preferences)
+2. **Deduplicates** against existing memories using content hashing and Jaccard similarity
+3. **Stores** unique items in `~/.codepi/memories/` with hotness scoring (frequency + recency decay)
+4. **Injects** relevant memories into the system prompt at the start of each new session
+
+Memories are ranked by a blended score of topic relevance (80%) and hotness (20%), capped at a configurable token budget.
+
+### Memory Categories
+
+| Category | Examples |
+|----------|----------|
+| `decisions` | "Using SQLite over JSON for storage", "Switching to async handlers" |
+| `patterns` | "Always check permissions before tool execution", "Error handling wraps all tool calls" |
+| `file-knowledge` | "Auth logic is in core/security.py", "Config lives in config.toml" |
+| `preferences` | "Prefer pytest over unittest", "Always use type hints" |
+
+### Memory Config
+
+```toml
+[memory]
+enabled = true                # Set to false to disable entirely
+max_items = 500               # Max stored memories (LRU eviction)
+injection_token_budget = 1000 # Max tokens injected into prompt
+hotness_half_life_days = 7    # Hotness decay rate
+dedup_jaccard_threshold = 0.7 # Similarity threshold for merge
+```
 
 ## Plan Mode
 
@@ -354,9 +395,9 @@ CLI → Modes → AgentSession → LLMProvider
 ```
 
 - **ai/**: LLM provider abstraction (OpenAI-compatible by default)
-- **core/**: AgentSession (turn loop), SessionManager (persistence)
+- **core/**: AgentSession (turn loop), SessionManager (persistence), memory system
 - **tools/**: Built-in tools (read, write, edit, bash, find, grep, ls)
-- **extensions/**: Python extension loader, skill loader
+- **extensions/**: Python extension loader, skill loader, memory extension
 - **tui/**: Terminal UI (prompt_toolkit + rich)
 - **modes/**: interactive, print, RPC, SDK
 

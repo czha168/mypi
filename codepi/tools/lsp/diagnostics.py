@@ -38,13 +38,13 @@ class LSPDiagnosticsTool(LSPTool):
 
             client = await self._get_client(workspace)
 
-            await client.notify_text_document_did_open(
+            await client.notify_text_document_did_open(  # type: ignore[attr-defined]
                 file_path=str(path),
                 text=path.read_text(),
                 language_id="python",
             )
 
-            diags = client.get_diagnostics(str(path))
+            diags = client.get_diagnostics(str(path))  # type: ignore[attr-defined]
 
             if not diags:
                 return ToolResult(output="No diagnostics found.")

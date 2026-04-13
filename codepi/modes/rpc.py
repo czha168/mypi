@@ -24,12 +24,21 @@ class RPCMode:
         extensions: list | None = None,
         skill_loader: SkillLoader | None = None,
     ):
+        ext_list = list(extensions or [])
+        try:
+            from codepi.config import load_config
+            cfg = load_config()
+            if cfg.memory.enabled:
+                from codepi.extensions.memory_extension import MemoryExtension
+                ext_list.append(MemoryExtension(config=cfg.memory))
+        except Exception:
+            pass
         self._session = AgentSession(
             provider=provider,
             session_manager=session_manager,
             model=model,
             tool_registry=tool_registry,
-            extensions=extensions or [],
+            extensions=ext_list,
             skill_loader=skill_loader,
         )
 

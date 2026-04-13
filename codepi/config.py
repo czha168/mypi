@@ -41,6 +41,13 @@ max_iterations = 100
 require_approval_for = ["push", "pr", "publish"]
 pause_on_errors = true
 auto_run_tests = true
+
+[memory]
+enabled = true
+max_items = 500
+injection_token_budget = 1000
+hotness_half_life_days = 7
+dedup_jaccard_threshold = 0.7
 """
 
 
@@ -96,6 +103,15 @@ class AutoModeConfigData:
 
 
 @dataclass
+class MemoryConfig:
+    enabled: bool = True
+    max_items: int = 500
+    injection_token_budget: int = 1000
+    hotness_half_life_days: int = 7
+    dedup_jaccard_threshold: float = 0.7
+
+
+@dataclass
 class ModesConfig:
     """Configuration for operation modes."""
     plan: PlanModeConfigData = field(default_factory=PlanModeConfigData)
@@ -110,6 +126,7 @@ class Config:
     lsp: LSPConfig = field(default_factory=LSPConfig)
     security: SecurityConfig = field(default_factory=SecurityConfig)
     modes: ModesConfig = field(default_factory=ModesConfig)
+    memory: MemoryConfig = field(default_factory=MemoryConfig)
 
 
 def load_config(config_path: Path | None = None) -> Config:
@@ -127,6 +144,7 @@ def load_config(config_path: Path | None = None) -> Config:
     modes_raw = raw.get("modes", {})
     plan_raw = modes_raw.get("plan", {})
     auto_raw = modes_raw.get("auto", {})
+    mem = raw.get("memory", {})
 
     # Environment variables override config file
     api_key = os.environ.get("OPENAI_API_KEY") or p.get("api_key", "")
@@ -169,5 +187,12 @@ def load_config(config_path: Path | None = None) -> Config:
                 pause_on_errors=auto_raw.get("pause_on_errors", True),
                 auto_run_tests=auto_raw.get("auto_run_tests", True),
             ),
+        ),
+        memory=MemoryConfig(
+            enabled=mem.get("enabled", True),
+            max_items=mem.get("max_items", 500),
+            injection_token_budget=mem.get("injection_token_budget", 1000),
+            hotness_half_life_days=mem.get("hotness_half_life_days", 7),
+            dedup_jaccard_threshold=mem.get("dedup_jaccard_threshold", 0.7),
         ),
     )

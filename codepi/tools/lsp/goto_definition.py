@@ -42,7 +42,7 @@ class LSPGotoDefinitionTool(LSPTool):
 
             client = await self._get_client(workspace)
 
-            locations = await client.request_definition_locations(
+            locations = await client.request_definition_locations(  # type: ignore[attr-defined]
                 file_path=str(path),
                 position=Position(line=line - 1, character=character),
             )

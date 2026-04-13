@@ -59,4 +59,3 @@ def test_attribution_idempotent(mock_run, tmp_dir, monkeypatch):
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
     )
-*** End of File

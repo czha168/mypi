@@ -55,7 +55,7 @@ class LSPRenameTool(LSPTool):
 
             client = await self._get_client(workspace)
 
-            rename_result = await client.request_rename_edits(
+            rename_result = await client.request_rename_edits(  # type: ignore[attr-defined]
                 file_path=str(path),
                 position=Position(line=line - 1, character=character),
                 new_name=new_name,
@@ -78,8 +78,8 @@ class LSPRenameTool(LSPTool):
             for change in rename_result.document_changes:
                 file_path_resolved = Path(client.from_uri(change.text_document.uri))
                 content = file_path_resolved.read_text()
+                lines = content.splitlines(keepends=True)
                 for edit in sorted(change.edits, key=lambda e: e.range.start.line, reverse=True):
-                    lines = content.splitlines(keepends=True)
                     start_line = edit.range.start.line
                     start_char = edit.range.start.character
                     end_line = edit.range.end.line

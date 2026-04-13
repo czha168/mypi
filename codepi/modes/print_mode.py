@@ -21,12 +21,21 @@ class PrintMode:
         skill_loader: SkillLoader | None = None,
     ):
         self.output = output
+        ext_list = list(extensions or [])
+        try:
+            from codepi.config import load_config
+            cfg = load_config()
+            if cfg.memory.enabled:
+                from codepi.extensions.memory_extension import MemoryExtension
+                ext_list.append(MemoryExtension(config=cfg.memory))
+        except Exception:
+            pass
         kwargs: dict = dict(
             provider=provider,
             session_manager=session_manager,
             model=model,
             tool_registry=tool_registry,
-            extensions=extensions or [],
+            extensions=ext_list,
             skill_loader=skill_loader,
         )
         if system_prompt:

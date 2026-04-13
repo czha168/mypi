@@ -35,7 +35,7 @@ class ExtensionLoader:
 
             class Handler(FileSystemEventHandler):
                 def on_modified(self, event):
-                    if event.src_path.endswith(".py"):
+                    if event.src_path.endswith(".py"):  # type: ignore[union-attr]
                         if on_idle():
                             logger.info(f"Hot-reloading extensions (triggered by {event.src_path})")
                             loader.load()

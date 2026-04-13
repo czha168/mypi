@@ -72,12 +72,22 @@ class InteractiveMode:
         self._model = model
         self._session_id = session_id
 
+        ext_list = list(extensions or [])
+        try:
+            from codepi.config import load_config
+            cfg = load_config()
+            if cfg.memory.enabled:
+                from codepi.extensions.memory_extension import MemoryExtension
+                ext_list.append(MemoryExtension(config=cfg.memory))
+        except Exception:
+            pass
+
         kwargs: dict = dict(
             provider=provider,
             session_manager=session_manager,
             model=model,
             tool_registry=tool_registry,
-            extensions=extensions or [],
+            extensions=ext_list,
             skill_loader=skill_loader,
             security_monitor=security_monitor,
             plan_mode_manager=plan_mode_manager,

@@ -1,1 +1,0 @@
-from dataclasses import dataclass\n\n@dataclass\nclass RateLimitEvent:\n    limit: int\n    remaining: int\n    reset: int\n    reset_datetime: str\n    used: int\n\n    def __post_init__(self):\n        import datetime\n        self.reset_datetime = datetime.datetime.fromtimestamp(self.reset).isoformat()\n

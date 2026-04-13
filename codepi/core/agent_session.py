@@ -2,6 +2,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
@@ -23,6 +24,25 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 DEFAULT_SYSTEM_PROMPT = "You are a helpful coding assistant. Use the available tools to help the user."
+
+
+def parse_tiered_response(raw: str) -> tuple[str, str]:
+    l0 = ""
+    l1 = ""
+    abstract_match = re.search(
+        r"ABSTRACT:\s*\n(.*?)(?=\n\s*\n\s*OVERVIEW:|\nOVERVIEW:|$)", raw, re.DOTALL | re.IGNORECASE,
+    )
+    overview_match = re.search(r"OVERVIEW:\s*\n(.*?)$", raw, re.DOTALL | re.IGNORECASE)
+    if abstract_match:
+        l0 = abstract_match.group(1).strip()
+    if overview_match:
+        l1 = overview_match.group(1).strip()
+    if not l1:
+        l1 = raw.strip()
+    if not l0:
+        first_sentence = re.split(r"[.!?]", l1, maxsplit=1)
+        l0 = first_sentence[0].strip() if first_sentence else l1[:200]
+    return l0, l1
 
 
 class AgentSession:
@@ -238,7 +258,7 @@ class AgentSession:
                     # Max retries exhausted - save recovery checkpoint
                     retry_after = 60  # default
                     if hasattr(e, 'retry_after'):
-                        retry_after = e.retry_after
+                        retry_after = e.retry_after  # type: ignore[attr-defined]
         
                     reason = f"Rate limited after {self.max_retries} attempts: {str(e)}"
                     self.session_manager.save_recovery_checkpoint(reason, retry_after)
@@ -426,23 +446,74 @@ class AgentSession:
 
     # AutoCompactionStartEvent/AutoCompactionEndEvent are dispatched by TUI layer
     async def _run_auto_compaction(self) -> None:
-        """Summarize current context and store a CompactionEntry."""
         context = self.session_manager.build_context()
         if not context:
             return
-        summary_prompt = [
+        tiered_prompt = [
             *context,
             {"role": "user", "content":
-             "Please summarize the conversation so far in a concise paragraph, "
-             "preserving all key decisions, file names, and code changes discussed."}
+             "Summarize this conversation in two sections:\n\n"
+             "ABSTRACT: A keyword/topic index in ~50 tokens listing key topics, "
+             "file names, and decisions as a comma-separated list.\n\n"
+             "OVERVIEW: A structured overview in ~500 tokens organized by topic, "
+             "preserving all key decisions, file names, code changes, and technical details.\n\n"
+             "Format your response as:\n"
+             "ABSTRACT:\n<abstract here>\n\n"
+             "OVERVIEW:\n<overview here>"},
         ]
-        summary_parts: list[str] = []
+        response_parts: list[str] = []
         async for event in self.provider.stream(
-            messages=summary_prompt, tools=[], model=self.model, system=""
+            messages=tiered_prompt, tools=[], model=self.model, system="",
         ):
             if isinstance(event, TokenEvent):
-                summary_parts.append(event.text)
-        summary = "".join(summary_parts)
+                response_parts.append(event.text)
+        raw_response = "".join(response_parts)
+        l0, l1 = parse_tiered_response(raw_response)
         self.session_manager.append(SessionEntry(
-            type="compaction", data={"summary": summary}
+            type="tiered_compaction",
+            data={"l0": l0, "l1": l1, "summary": l1},
         ))
+        if self._memory_enabled():
+            await self._run_memory_extraction(l1)
+
+    def _memory_enabled(self) -> bool:
+        try:
+            from codepi.config import MemoryConfig
+            return True
+        except ImportError:
+            return False
+
+    async def _run_memory_extraction(self, l1_overview: str) -> None:
+        try:
+            from codepi.config import MemoryConfig
+            from codepi.core.memory_store import MemoryStore
+            from codepi.core.memory_extractor import MemoryExtractor
+            from codepi.core.memory_dedup import MemoryDeduplicator
+        except ImportError:
+            return
+
+        store = MemoryStore()
+        extractor = MemoryExtractor()
+        dedup = MemoryDeduplicator()
+        dedup.index_existing(store)
+
+        session_id = self.session_manager.session_id or ""
+        candidates = await extractor.extract(l1_overview, session_id, self.provider, self.model)
+
+        for candidate in candidates:
+            result = dedup.check(candidate, store)
+            if result.decision.value == "skip":
+                if result.matched_id:
+                    existing = store.get(result.matched_id)
+                    if existing:
+                        store.update(result.matched_id, access_count=existing.access_count + 1)
+            elif result.decision.value == "merge":
+                if result.matched_id:
+                    existing = store.get(result.matched_id)
+                    if existing:
+                        merged = dedup.merge_content(existing.content, candidate.content)
+                        store.update(result.matched_id, content=merged, access_count=existing.access_count + 1)
+            else:
+                store.add(candidate)
+
+        store.enforce_capacity()

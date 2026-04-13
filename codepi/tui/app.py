@@ -3,6 +3,7 @@ from prompt_toolkit import PromptSession
 from prompt_toolkit.history import InMemoryHistory
 from codepi.tui.components import make_keybindings, default_toolbar
 from codepi.tui.renderer import StreamingRenderer
+from codepi.tui.rich_renderer import RichRenderer
 from rich.console import Console
 from typing import Callable
 
@@ -22,7 +23,7 @@ class TUIApp:
         self.model = model
         self.session_id = session_id
         self.console = Console()
-        self.renderer = StreamingRenderer(console=self.console)
+        self.renderer: StreamingRenderer | RichRenderer = StreamingRenderer(console=self.console)
         self._get_mode_info = get_mode_info or (lambda: ("normal", None))
 
         # Use no-ops for unset callbacks

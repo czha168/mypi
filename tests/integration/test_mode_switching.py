@@ -52,6 +52,7 @@ class TestPlanModeSwitching:
         plan_file = tmp_path / "plan.md"
         plan_manager = PlanModeManager(config=PlanModeConfig(enabled=True))
         plan_manager.start("Test request", plan_file=plan_file)
+        assert plan_manager.state is not None
         plan_manager.state.phase = PlanPhase.FINALIZE
         
         session = AgentSession(

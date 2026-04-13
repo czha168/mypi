@@ -27,9 +27,11 @@ class TestRichInputWithRegistry:
         reg = CommandRegistry()
         reg.register(Command(name="/help"))
         inp = RichInput(command_registry=reg)
+        assert inp._prompt_session is not None
         assert inp._prompt_session.completer is not None
 
     def test_prompt_session_complete_while_typing(self):
         reg = CommandRegistry()
         inp = RichInput(command_registry=reg)
+        assert inp._prompt_session is not None
         assert inp._prompt_session.complete_while_typing is True

@@ -41,7 +41,7 @@ ProviderEvent = Union[TokenEvent, LLMToolCallEvent, DoneEvent, RateLimitEvent]
 
 class LLMProvider(ABC):
     @abstractmethod
-    async def stream(
+    def stream(
         self,
         messages: list[dict],
         tools: list[dict],

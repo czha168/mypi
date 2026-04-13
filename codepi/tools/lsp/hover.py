@@ -42,7 +42,7 @@ class LSPHoverTool(LSPTool):
 
             client = await self._get_client(workspace)
 
-            hover_result = await client.request_hover(
+            hover_result = await client.request_hover(  # type: ignore[attr-defined]
                 file_path=str(path),
                 position=Position(line=line - 1, character=character),
             )

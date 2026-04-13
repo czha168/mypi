@@ -72,7 +72,7 @@ class LSPClientManager:
             WithRequestRename,
             WithRequestHover,
         )
-        from lsp_client.capability.notification import WithReceivePublishDiagnostics
+        from lsp_client.capability.notification import WithReceivePublishDiagnostics  # type: ignore[attr-defined]
         from lsp_client.server import LocalServer
 
         cmd = cls.SERVER_COMMANDS.get(server_type, [])
@@ -90,8 +90,16 @@ class LSPClientManager:
         ):
             _diagnostics: dict[str, list] = {}
 
-            def create_default_servers(self):
+            def create_default_servers(self):  # type: ignore[override]
                 return LocalServer(program=cmd[0], args=cmd[1:] if len(cmd) > 1 else [])
+
+            def get_language_config(self, language_id: str) -> dict:  # type: ignore[override]
+                """Return default language config for the given language."""
+                return {}
+
+            def check_server_compatibility(self, server_info: object) -> bool:  # type: ignore[override]
+                """Check if the server is compatible. Always returns True."""
+                return True
 
             async def handle_publish_diagnostics(
                 self, uri: str, diagnostics: list, version: int | None = None

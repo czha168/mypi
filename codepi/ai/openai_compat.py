@@ -10,7 +10,7 @@ class OpenAICompatProvider(LLMProvider):
         self.default_model = default_model
         self._client = openai.AsyncOpenAI(base_url=base_url, api_key=api_key)
 
-    async def stream(  # type: ignore[reportIncompatibleMethodOverride]
+    async def stream(
         self,
         messages: list[dict],
         tools: list[dict],

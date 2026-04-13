@@ -119,9 +119,14 @@ class SessionManager:
         for entry in path:
             if entry.type == "session_info":
                 continue
-            if entry.type == "compaction":
-                # Path-local: reset messages, inject summary
-                messages = [{"role": "system", "content": f"[Context summary]: {entry.data.get('summary', '')}"}]
+            if entry.type == "tiered_compaction":
+                l1 = entry.data.get("l1", "")
+                summary = entry.data.get("summary", l1)
+                content = f"[Context summary]: {l1}" if l1 else f"[Context summary]: {summary}"
+                messages = [{"role": "system", "content": content}]
+            elif entry.type == "compaction":
+                summary = entry.data.get("summary", "")
+                messages = [{"role": "system", "content": f"[Context summary]: {summary}"}]
             elif entry.type == "message":
                 role = entry.data.get("role", "user")
                 content = entry.data.get("content", "")

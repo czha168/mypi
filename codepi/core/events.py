@@ -114,3 +114,23 @@ class PlanModePhaseEvent:
     phase: int  # 1-5: UNDERSTAND, DESIGN, REVIEW, FINALIZE, EXIT
     phase_name: str
     plan_file: str | None = None
+
+
+# ---------------------------------------------------------------------------
+# Memory events — for memory lifecycle
+# ---------------------------------------------------------------------------
+
+@dataclass
+class MemoryDedupEvent:
+    candidate_hash: str
+    matched_hash: str | None
+    similarity_score: float
+    decision: str  # DedupDecision value
+    category: str  # MemoryCategory value
+
+
+@dataclass
+class MemoryExtractEvent:
+    session_id: str
+    items_extracted: int
+    categories_breakdown: dict  # {category_name: count}

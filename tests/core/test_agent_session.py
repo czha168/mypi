@@ -160,6 +160,10 @@ async def test_compaction_runs_when_threshold_exceeded(tmp_sessions_dir):
     await session.prompt("heavy request")
 
     entries = sm.load_all_entries()
-    compaction_entries = [e for e in entries if e.type == "compaction"]
+    compaction_entries = [e for e in entries if e.type in ("compaction", "tiered_compaction")]
     assert len(compaction_entries) == 1
-    assert "Summary" in compaction_entries[0].data.get("summary", "")
+    entry = compaction_entries[0]
+    if entry.type == "tiered_compaction":
+        assert "Summary" in entry.data.get("l1", "") or "Summary" in entry.data.get("l0", "")
+    else:
+        assert "Summary" in entry.data.get("summary", "")
