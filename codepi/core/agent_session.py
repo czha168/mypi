@@ -54,7 +54,7 @@ class AgentSession:
         tool_registry: ToolRegistry | None = None,
         extensions: list[Extension] | None = None,
         system_prompt: str = DEFAULT_SYSTEM_PROMPT,
-        compaction_threshold: float = 0.80,
+        compaction_threshold: float = 0.50,
         max_retries: int = 3,
         context_window: int = 128_000,
         skill_loader: SkillLoader | None = None,

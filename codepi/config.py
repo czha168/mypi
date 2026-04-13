@@ -13,7 +13,7 @@ api_key  = ""
 model    = "gpt-4o"
 
 [session]
-compaction_threshold = 0.80
+compaction_threshold = 0.50
 max_retries = 3
 
 [paths]
@@ -60,7 +60,7 @@ class ProviderConfig:
 
 @dataclass
 class SessionConfig:
-    compaction_threshold: float = 0.80
+    compaction_threshold: float = 0.50
     max_retries: int = 3
 
 
@@ -157,7 +157,7 @@ def load_config(config_path: Path | None = None) -> Config:
             model=p.get("model", "gpt-4o"),
         ),
         session=SessionConfig(
-            compaction_threshold=s.get("compaction_threshold", 0.80),
+            compaction_threshold=s.get("compaction_threshold", 0.50),
             max_retries=s.get("max_retries", 3),
         ),
         paths=PathsConfig(

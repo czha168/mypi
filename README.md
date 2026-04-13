@@ -61,7 +61,7 @@ api_key  = ""
 model    = "gpt-4o"
 
 [session]
-compaction_threshold = 0.80
+compaction_threshold = 0.50
 max_retries = 3
 
 [lsp]
@@ -270,7 +270,7 @@ Sessions are stored as JSONL files in `~/.codepi/sessions/`. Resume with:
 codepi --session 550e8400-e29b-41d4-a716-446655440000
 ```
 
-**Auto-compaction** triggers at 80% context window usage — the model summarizes conversation history to free up tokens. Compaction produces two tiers: a short keyword abstract (L0) and a structured overview (L1), enabling context-aware reconstruction based on available token budget.
+**Auto-compaction** triggers at 50% context window usage — the model summarizes conversation history to free up tokens. Compaction produces two tiers: a short keyword abstract (L0) and a structured overview (L1), enabling context-aware reconstruction based on available token budget.
 
 **Branching** allows exploring alternative approaches. The session tree preserves history for each branch.
 
