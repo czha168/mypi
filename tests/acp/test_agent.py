@@ -1,4 +1,5 @@
 import uuid
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -8,7 +9,10 @@ from codepi.config import Config
 
 @pytest.fixture
 def agent():
-    return CodepiAgent(Config())
+    cfg = Config()
+    agent = CodepiAgent(cfg)
+    agent.on_connect(AsyncMock())
+    return agent
 
 
 @pytest.mark.asyncio
@@ -40,9 +44,48 @@ async def test_new_session_returns_uuid_and_four_modes(agent):
 
 
 @pytest.mark.asyncio
-async def test_prompt_raises_not_implemented(agent):
-    with pytest.raises(NotImplementedError, match="Phase 2"):
-        await agent.prompt(prompt=[], session_id="x")
+async def test_new_session_creates_adapter(agent):
+    resp = await agent.new_session(cwd="/tmp")
+    sid = resp.session_id
+    assert sid in agent._sessions
+    from codepi.acp.session_adapter import ACPSessionAdapter
+    assert isinstance(agent._sessions[sid], ACPSessionAdapter)
+
+
+@pytest.mark.asyncio
+async def test_prompt_raises_valueerror_for_unknown_session(agent):
+    with pytest.raises(ValueError, match="Unknown session"):
+        await agent.prompt(prompt=[{"type": "text", "text": "hi"}], session_id="nonexistent")
+
+
+@pytest.mark.asyncio
+async def test_prompt_delegates_to_adapter(agent):
+    resp = await agent.new_session(cwd="/tmp")
+    sid = resp.session_id
+    adapter = agent._sessions[sid]
+    mock_response = MagicMock()
+    adapter.run_prompt = AsyncMock(return_value=mock_response)
+
+    result = await agent.prompt(prompt=[{"type": "text", "text": "hello"}], session_id=sid)
+
+    adapter.run_prompt.assert_awaited_once_with([{"type": "text", "text": "hello"}])
+    assert result is mock_response
+
+
+@pytest.mark.asyncio
+async def test_cancel_delegates_to_adapter(agent):
+    resp = await agent.new_session(cwd="/tmp")
+    sid = resp.session_id
+    adapter = agent._sessions[sid]
+    adapter.cancel = MagicMock()
+
+    await agent.cancel(session_id=sid)
+    adapter.cancel.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_cancel_handles_unknown_session(agent):
+    await agent.cancel(session_id="nonexistent")  # Should not raise
 
 
 @pytest.mark.asyncio

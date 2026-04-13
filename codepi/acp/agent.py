@@ -28,6 +28,7 @@ from acp.schema import (
     SetSessionModelResponse,
 )
 
+from codepi.acp.session_adapter import ACPSessionAdapter
 from codepi.config import Config
 
 __version__ = "0.1.0"
@@ -46,7 +47,7 @@ class CodepiAgent:
     def __init__(self, config: Config) -> None:
         self._config = config
         self._conn: Client | None = None
-        self._sessions: dict[str, dict[str, Any]] = {}
+        self._sessions: dict[str, ACPSessionAdapter] = {}
 
     def on_connect(self, conn: Client) -> None:
         self._conn = conn
@@ -83,7 +84,9 @@ class CodepiAgent:
         **kwargs: Any,
     ) -> NewSessionResponse:
         session_id = str(uuid.uuid4())
-        self._sessions[session_id] = {"cwd": cwd}
+        self._sessions[session_id] = ACPSessionAdapter(
+            session_id=session_id, cwd=cwd, config=self._config, conn=self._conn,  # type: ignore[arg-type]
+        )
         return NewSessionResponse(
             session_id=session_id,
             modes=SessionModeState(
@@ -104,10 +107,17 @@ class CodepiAgent:
         message_id: str | None = None,
         **kwargs: Any,
     ) -> PromptResponse:
-        raise NotImplementedError("Phase 2: session/prompt not yet implemented")
+        adapter = self._sessions.get(session_id)
+        if adapter is None:
+            raise ValueError(f"Unknown session: {session_id}")
+        return await adapter.run_prompt(prompt)
 
     async def cancel(self, session_id: str, **kwargs: Any) -> None:
-        raise NotImplementedError("Phase 2: session/cancel not yet implemented")
+        adapter = self._sessions.get(session_id)
+        if adapter is None:
+            logger.warning("Cancel called for unknown session: %s", session_id)
+            return
+        adapter.cancel()
 
     async def load_session(
         self, cwd: str, session_id: str, mcp_servers: list | None = None, **kwargs: Any

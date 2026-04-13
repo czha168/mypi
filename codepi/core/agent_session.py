@@ -82,6 +82,7 @@ class AgentSession:
         self._is_idle = True
         self._in_flight_tool: str | None = None
         self._steer_override: str | None = None
+        self._cancelled: bool = False
 
         # Mode managers
         self._plan_mode_manager = plan_mode_manager
@@ -99,6 +100,13 @@ class AgentSession:
     @property
     def is_idle(self) -> bool:
         return self._is_idle
+
+    @property
+    def is_cancelled(self) -> bool:
+        return self._cancelled
+
+    def cancel(self) -> None:
+        self._cancelled = True
 
     @property
     def current_mode(self) -> str:
@@ -211,6 +219,7 @@ class AgentSession:
     async def prompt(self, text: str) -> None:
         if not self._is_idle:
             raise RuntimeError("Cannot prompt while a turn is already in progress")
+        self._cancelled = False
         self._is_idle = False
         try:
             if self._is_opsx_command(text):

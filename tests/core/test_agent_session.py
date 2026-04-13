@@ -167,3 +167,22 @@ async def test_compaction_runs_when_threshold_exceeded(tmp_sessions_dir):
         assert "Summary" in entry.data.get("l1", "") or "Summary" in entry.data.get("l0", "")
     else:
         assert "Summary" in entry.data.get("summary", "")
+
+
+@pytest.mark.asyncio
+async def test_cancel_sets_flag_and_prompt_resets(tmp_sessions_dir):
+    """cancel() sets is_cancelled to True; prompt() resets it to False."""
+    events = [TokenEvent(text="hi"), DoneEvent(usage=TokenUsage(5, 3))]
+    provider = make_mock_provider(events)
+    sm = SessionManager(tmp_sessions_dir)
+    sm.new_session(model="gpt-4o")
+    session = AgentSession(provider=provider, session_manager=sm, model="gpt-4o")
+
+    assert session.is_cancelled is False
+
+    session.cancel()
+    assert session.is_cancelled is True
+
+    # prompt() should reset the flag
+    await session.prompt("hello")
+    assert session.is_cancelled is False
