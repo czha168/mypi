@@ -2,6 +2,7 @@ from __future__ import annotations
 import asyncio
 from typing import TYPE_CHECKING
 from rich.console import Console
+from rich.table import Table
 from pathlib import Path
 
 from codepi.core.agent_session import AgentSession
@@ -44,6 +45,14 @@ class InteractiveMode:
         if skill_loader:
             self._command_registry.load_from_skill_loader(skill_loader)
         self._register_builtin_commands()
+
+        self._command_handlers: dict = {
+            "/exit": self._handle_exit,
+            "/quit": self._handle_exit,
+            "/help": self._handle_help,
+            "/clear": self._handle_clear,
+            "/websearch": self._handle_websearch,
+        }
 
         self._input_handler = RichInput(
             console=self._console,
@@ -116,9 +125,62 @@ class InteractiveMode:
             Command(name="/clear", description="Clear the terminal screen", category="general"),
             Command(name="/exit", description="Exit the session", aliases=["/quit"], category="general"),
             Command(name="/model", description="Show or switch the current model", category="general"),
+            Command(name="/websearch", description="Search the web using DuckDuckGo", category="general"),
         ]
         for cmd in builtins:
             self._command_registry.register(cmd)
+
+    async def _dispatch_command(self, text: str) -> bool:
+        text = text.strip()
+        if not text.startswith("/"):
+            return False
+
+        parts = text.split(None, 1)
+        command_name = parts[0]
+        args = parts[1].strip() if len(parts) > 1 else ""
+
+        handler = self._command_handlers.get(command_name)
+        if handler is None:
+            return False
+
+        await handler(args)
+        return True
+
+    async def _handle_exit(self, args: str) -> None:
+        self._is_running = False
+        self._renderer.render_info("Goodbye!")
+
+    async def _handle_help(self, args: str) -> None:
+        commands = self._command_registry.list_commands()
+        table = Table(title="Available Commands", show_header=True)
+        table.add_column("Command", style="cyan")
+        table.add_column("Aliases", style="dim")
+        table.add_column("Description", style="white")
+        for cmd in commands:
+            aliases = ", ".join(cmd.aliases) if cmd.aliases else ""
+            table.add_row(cmd.name, aliases, cmd.description)
+        self._console.print(table)
+
+    async def _handle_websearch(self, args: str) -> None:
+        if not args.strip():
+            self._renderer.render_info("Usage: /websearch <query>")
+            return
+
+        try:
+            from codepi.tools.web.web_search import WebSearchTool
+            tool = WebSearchTool()
+            result = await tool.execute(query=args)
+            if result.error:
+                self._renderer.render_error(f"Web search failed: {result.error}")
+            elif result.output:
+                self._renderer.render_info(result.output)
+        except ImportError:
+            self._renderer.render_error(
+                "web_search requires ddgs. Install with: pip install codepi[web]"
+            )
+
+    async def _handle_clear(self, args: str) -> None:
+        self._console.clear()
 
     def _handle_mode_change(self, old_mode: str, new_mode: str) -> None:
         self._current_mode = new_mode
@@ -174,6 +236,9 @@ class InteractiveMode:
             if not text.strip():
                 continue
             
+            if await self._dispatch_command(text):
+                continue
+            
             # Display user message
             self._renderer.render_user_message(text)
             
@@ -196,5 +261,4 @@ class InteractiveMode:
             for queued in self._follow_up_queue:
                 await self._session.follow_up(queued)
             self._follow_up_queue.clear()
-        
-        self._renderer.render_info("Goodbye!")
+
