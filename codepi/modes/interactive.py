@@ -6,6 +6,7 @@ from pathlib import Path
 
 from codepi.core.agent_session import AgentSession
 from codepi.core.session_manager import SessionManager
+from codepi.core.commands import CommandRegistry
 from codepi.ai.provider import LLMProvider
 from codepi.tools.base import ToolRegistry
 from codepi.tui.app import TUIApp
@@ -38,7 +39,16 @@ class InteractiveMode:
         self._session_manager = session_manager
         self._console = Console()
         self._renderer = RichRenderer(console=self._console)
-        self._input_handler = RichInput(console=self._console)
+
+        self._command_registry = CommandRegistry()
+        if skill_loader:
+            self._command_registry.load_from_skill_loader(skill_loader)
+        self._register_builtin_commands()
+
+        self._input_handler = RichInput(
+            console=self._console,
+            command_registry=self._command_registry,
+        )
         self._security_monitor = security_monitor
         self._plan_mode_manager = plan_mode_manager
         self._auto_mode_manager = auto_mode_manager
@@ -88,6 +98,17 @@ class InteractiveMode:
 
     def _get_mode_info(self) -> tuple[str, int | None]:
         return self._current_mode, self._current_phase
+
+    def _register_builtin_commands(self) -> None:
+        from codepi.core.commands import Command
+        builtins = [
+            Command(name="/help", description="Show available commands and shortcuts", category="general"),
+            Command(name="/clear", description="Clear the terminal screen", category="general"),
+            Command(name="/exit", description="Exit the session", aliases=["/quit"], category="general"),
+            Command(name="/model", description="Show or switch the current model", category="general"),
+        ]
+        for cmd in builtins:
+            self._command_registry.register(cmd)
 
     def _handle_mode_change(self, old_mode: str, new_mode: str) -> None:
         self._current_mode = new_mode

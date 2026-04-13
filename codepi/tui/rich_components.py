@@ -1,25 +1,54 @@
 """Reusable Rich UI components for codepi terminal interface."""
 
+from __future__ import annotations
+
+import asyncio
+from xml.sax.saxutils import escape as xml_escape
+from typing import TYPE_CHECKING
+
 from rich.console import Console
 from rich.table import Table
 from rich.text import Text
-from typing import Optional
-import asyncio
+from prompt_toolkit import PromptSession
+from prompt_toolkit.formatted_text import HTML
+
+if TYPE_CHECKING:
+    from codepi.core.commands import CommandRegistry
 
 
 class RichInput:
     """Async input handler with rich formatting."""
-    
-    def __init__(self, console: Console | None = None):
+
+    def __init__(
+        self,
+        console: Console | None = None,
+        command_registry: CommandRegistry | None = None,
+    ):
         self.console = console or Console()
-    
+        self._command_registry = command_registry
+        if command_registry is not None:
+            from codepi.core.commands import SlashCommandCompleter
+            self._prompt_session = PromptSession(
+                completer=SlashCommandCompleter(command_registry),
+                complete_while_typing=True,
+            )
+        else:
+            self._prompt_session = None
+
     async def get_user_input(self, prompt: str = "You") -> str:
-        """Get user input with rich prompt."""
-        prompt_text = Text(f"{prompt} › ", style="bold cyan")
-        return await asyncio.to_thread(self._get_input_sync, prompt_text)
-    
+        if self._prompt_session is not None:
+            formatted = HTML(f'<style fg="cyan" bold="bold">{xml_escape(prompt)} › </style>')
+            try:
+                return await self._prompt_session.prompt_async(formatted)
+            except EOFError:
+                raise KeyboardInterrupt
+            except KeyboardInterrupt:
+                raise
+        else:
+            prompt_text = Text(f"{prompt} › ", style="bold cyan")
+            return await asyncio.to_thread(self._get_input_sync, prompt_text)
+
     def _get_input_sync(self, prompt: Text) -> str:
-        """Synchronous input with rich prompt."""
         try:
             return self.console.input(prompt)
         except EOFError:
