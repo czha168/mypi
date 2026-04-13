@@ -235,4 +235,11 @@ def make_builtin_registry(skill_loader_getter=None, include_lsp: bool = True) ->
                 reg.register(tool)
         except ImportError:
             pass
+    try:
+        from codepi.tools.web import WebSearchTool, WebFetchTool, SiteScrapTool
+        for tool_cls in (WebSearchTool, WebFetchTool, SiteScrapTool):
+            if tool_cls is not None:
+                reg.register(tool_cls())
+    except ImportError:
+        pass
     return reg
