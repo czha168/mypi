@@ -8,10 +8,12 @@ from acp import Client, PromptResponse
 from acp.schema import (
     AgentMessageChunk,
     ContentToolCallContent,
+    CurrentModeUpdate,
     TextContentBlock,
     ToolCallLocation,
     ToolCallStart,
     ToolCallUpdate,
+    UserMessageChunk,
 )
 
 from codepi.acp.tool_adapter import (
@@ -51,20 +53,31 @@ class ACPSessionAdapter:
         self._current_tool_name: str | None = None
         self._current_tool_arguments: dict = {}
         self._cancel_event: asyncio.Event = asyncio.Event()
+        self._current_mode_id: str = "code"
+        self._pending_mode: str | None = None
+        self._pending_model: str | None = None
+        self._loaded_session_manager: SessionManager | None = None
 
     async def _setup(self) -> None:
         if self._agent_session is not None:
             return
         provider = self._create_provider()
-        sm = SessionManager(self.config.paths.sessions_dir / self.session_id)
-        sm.new_session(model=self.config.provider.model)
+
+        if self._loaded_session_manager is not None:
+            sm = self._loaded_session_manager
+        else:
+            sm = SessionManager(self.config.paths.sessions_dir / self.session_id)
+            sm.new_session(model=self.config.provider.model)
+
         registry = self._create_tool_registry()
         extensions = self._load_extensions()
         security_monitor = SecurityMonitor(self.config.security)
+
+        model = self._pending_model or self.config.provider.model
         self._agent_session = AgentSession(
             provider=provider,
             session_manager=sm,
-            model=self.config.provider.model,
+            model=model,
             tool_registry=registry,
             extensions=extensions,
             compaction_threshold=self.config.session.compaction_threshold,
@@ -76,6 +89,11 @@ class ACPSessionAdapter:
         self._agent_session.on_tool_call = self._on_tool_call
         self._agent_session.on_tool_result = self._on_tool_result
         self._agent_session.on_error = self._on_error
+
+        if self._pending_mode is not None:
+            self._apply_mode(self._pending_mode)
+            self._pending_mode = None
+        self._pending_model = None
 
     async def _send_update(self, update) -> None:
         await self._conn.session_update(session_id=self.session_id, update=update)
@@ -154,6 +172,58 @@ class ACPSessionAdapter:
         except asyncio.TimeoutError:
             logger.warning("Permission request timed out for tool call %s", self._current_tool_call_id)
             return False
+
+    def _setup_from_loaded_session(self, sm: SessionManager) -> None:
+        self._loaded_session_manager = sm
+
+    async def replay_history(self) -> None:
+        sm = self._loaded_session_manager
+        if sm is None:
+            return
+        for entry in sm.load_all_entries():
+            if entry.type != "message":
+                continue
+            role = entry.data.get("role", "")
+            content = entry.data.get("content", "")
+            if role == "user":
+                update = UserMessageChunk(
+                    content=TextContentBlock(type="text", text=content),
+                    session_update="user_message_chunk",
+                )
+            elif role == "assistant":
+                update = AgentMessageChunk(
+                    content=TextContentBlock(type="text", text=content),
+                    session_update="agent_message_chunk",
+                )
+            else:
+                continue
+            await self._send_update(update)
+
+    def set_mode(self, mode_id: str) -> None:
+        if self._agent_session is None:
+            self._pending_mode = mode_id
+            return
+        self._apply_mode(mode_id)
+
+    def _apply_mode(self, mode_id: str) -> None:
+        assert self._agent_session is not None
+        if mode_id == "plan":
+            self._agent_session.start_plan_mode("")
+        elif mode_id == "auto":
+            self._agent_session.start_auto_mode()
+        elif mode_id in ("code", "ask"):
+            if self._current_mode_id == "plan":
+                self._agent_session.stop_plan_mode()
+            elif self._current_mode_id == "auto":
+                self._agent_session.stop_auto_mode()
+        self._current_mode_id = mode_id
+
+    async def _send_mode_update(self, mode_id: str) -> None:
+        update = CurrentModeUpdate(
+            current_mode_id=mode_id,
+            session_update="current_mode_update",
+        )
+        await self._send_update(update)
 
     def _create_provider(self):
         return OpenAICompatProvider(
