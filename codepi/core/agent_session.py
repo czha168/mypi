@@ -3,8 +3,8 @@ import asyncio
 import json
 import logging
 import re
-from collections.abc import Callable
-from typing import TYPE_CHECKING
+from collections.abc import Awaitable, Callable
+from typing import TYPE_CHECKING, Union
 
 from codepi.ai.provider import LLMProvider, TokenEvent, LLMToolCallEvent, DoneEvent
 from codepi.core.events import (
@@ -59,7 +59,7 @@ class AgentSession:
         context_window: int = 128_000,
         skill_loader: SkillLoader | None = None,
         security_monitor: "SecurityMonitor | None" = None,
-        on_security_ask: Callable[[str, str], bool] | None = None,
+        on_security_ask: Union[Callable[[str, str], bool], Callable[[str, str], Awaitable[bool]], None] = None,
         plan_mode_manager: "PlanModeManager | None" = None,
         auto_mode_manager: "AutoModeManager | None" = None,
         on_mode_change: Callable[[str, str], None] | None = None,
@@ -381,7 +381,10 @@ class AgentSession:
                             tool_result = ToolResult(error=f"Security: {decision.reason}")
                         elif decision.action == SecurityAction.ASK:
                             if self._on_security_ask:
-                                approved = self._on_security_ask(decision.reason, decision.rule_id)
+                                if asyncio.iscoroutinefunction(self._on_security_ask):
+                                    approved = await self._on_security_ask(decision.reason, decision.rule_id)
+                                else:
+                                    approved = self._on_security_ask(decision.reason, decision.rule_id)
                                 if not approved:
                                     tool_result = ToolResult(
                                         error=f"Security: Operation rejected by user - {decision.reason}"

@@ -14,28 +14,20 @@ from acp.schema import (
     ToolCallUpdate,
 )
 
+from codepi.acp.tool_adapter import (
+    build_permission_options,
+    extract_diff_content,
+    extract_locations,
+    map_tool_kind,
+)
 from codepi.ai.openai_compat import OpenAICompatProvider
 from codepi.config import Config
 from codepi.core.agent_session import AgentSession
+from codepi.core.security import SecurityMonitor
 from codepi.core.session_manager import SessionManager
 from codepi.tools.builtins import make_builtin_registry
 
 logger = logging.getLogger(__name__)
-
-_TOOL_KIND_MAP: dict[str, str] = {
-    "read": "read",
-    "write": "edit",
-    "edit": "edit",
-    "bash": "execute",
-    "find": "search",
-    "grep": "search",
-    "ls": "read",
-    "lsp_diagnostics": "read",
-    "lsp_goto_definition": "read",
-    "lsp_find_references": "search",
-    "lsp_hover": "read",
-    "lsp_rename": "edit",
-}
 
 ToolKindType = Literal["read", "edit", "delete", "move", "search", "execute", "think", "fetch", "switch_mode", "other"]
 StopReasonType = Literal["end_turn", "max_tokens", "max_turn_requests", "refusal", "cancelled"]
@@ -56,6 +48,8 @@ class ACPSessionAdapter:
         self._agent_session: AgentSession | None = None
         self._tool_call_counter: int = 0
         self._current_tool_call_id: str | None = None
+        self._current_tool_name: str | None = None
+        self._current_tool_arguments: dict = {}
         self._cancel_event: asyncio.Event = asyncio.Event()
 
     async def _setup(self) -> None:
@@ -66,6 +60,7 @@ class ACPSessionAdapter:
         sm.new_session(model=self.config.provider.model)
         registry = self._create_tool_registry()
         extensions = self._load_extensions()
+        security_monitor = SecurityMonitor(self.config.security)
         self._agent_session = AgentSession(
             provider=provider,
             session_manager=sm,
@@ -74,6 +69,8 @@ class ACPSessionAdapter:
             extensions=extensions,
             compaction_threshold=self.config.session.compaction_threshold,
             max_retries=self.config.session.max_retries,
+            security_monitor=security_monitor,
+            on_security_ask=self._on_security_ask,
         )
         self._agent_session.on_token = self._on_token
         self._agent_session.on_tool_call = self._on_tool_call
@@ -93,8 +90,10 @@ class ACPSessionAdapter:
     def _on_tool_call(self, name: str, arguments: dict) -> None:
         self._tool_call_counter += 1
         self._current_tool_call_id = f"call_{self._tool_call_counter}"
-        kind = self._map_tool_kind(name)
-        locations = self._extract_locations(name, arguments)
+        self._current_tool_name = name
+        self._current_tool_arguments = arguments
+        kind = map_tool_kind(name)
+        locations = extract_locations(name, arguments)
         update = ToolCallStart(
             tool_call_id=self._current_tool_call_id,
             title=name,
@@ -111,6 +110,12 @@ class ACPSessionAdapter:
         has_error = result.error is not None if hasattr(result, "error") else isinstance(result, Exception)
         text = result.error if has_error else (result.output if hasattr(result, "output") else str(result))
         content: list = [ContentToolCallContent(content=TextContentBlock(type="text", text=text), type="content")]
+
+        if not has_error:
+            diff_content = extract_diff_content(name, self._current_tool_arguments, result)
+            if diff_content:
+                content.extend(diff_content)
+
         update = ToolCallUpdate(
             tool_call_id=self._current_tool_call_id,
             status="failed" if has_error else "completed",
@@ -125,16 +130,30 @@ class ACPSessionAdapter:
         )
         asyncio.create_task(self._send_update(update))
 
-    @staticmethod
-    def _map_tool_kind(tool_name: str) -> str:
-        return _TOOL_KIND_MAP.get(tool_name, "other")
-
-    @staticmethod
-    def _extract_locations(tool_name: str, arguments: dict) -> list | None:
-        path = arguments.get("file_path") or arguments.get("path")
-        if path:
-            return [ToolCallLocation(path=path)]
-        return None
+    async def _on_security_ask(self, reason: str, rule_id: str) -> bool:
+        if self._current_tool_call_id is None:
+            return False
+        kind = map_tool_kind(self._current_tool_name or "")
+        tool_call = ToolCallUpdate(
+            tool_call_id=self._current_tool_call_id,
+            kind=kind,  # type: ignore[arg-type]
+            status="pending",
+            title=f"Permission required: {reason}",
+        )
+        options = build_permission_options()
+        try:
+            response = await asyncio.wait_for(
+                self._conn.request_permission(
+                    options=options,
+                    session_id=self.session_id,
+                    tool_call=tool_call,
+                ),
+                timeout=120.0,
+            )
+            return response.outcome.outcome == "selected"
+        except asyncio.TimeoutError:
+            logger.warning("Permission request timed out for tool call %s", self._current_tool_call_id)
+            return False
 
     def _create_provider(self):
         return OpenAICompatProvider(
